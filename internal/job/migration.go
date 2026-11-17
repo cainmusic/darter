@@ -27,6 +27,7 @@ type MigrationSpec struct {
 	TargetBranch string `json:"target_branch"`          // 目标分支：从 TargetBase 切出，接收 cherry-pick
 	StartCommit  string `json:"start_commit,omitempty"` // 连续迁移起点（源分支 commit hash）
 	EndCommit    string `json:"end_commit,omitempty"`   // 连续迁移终点（源分支 commit hash）
+	MaxRetries   int    `json:"max_retries,omitempty"`  // 冲突解决/回归修复的重试次数（默认 5）
 }
 
 // CommitState 单个源 commit 的迁移状态。

@@ -3,13 +3,14 @@ import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   NButton, NCard, NEmpty, NGrid, NGridItem, NModal, NForm, NFormItem,
-  NInput, NSelect, NAlert, NSpace, NSpin, useMessage,
+  NInput, NInputNumber, NSelect, NSpace, NSpin, useMessage,
 } from 'naive-ui'
 import {
-  listMigrations, createMigration, listConstraintTemplates, concatTemplateContent,
-  type MigJob, type CreateMigrationInput, type ConstraintTemplate,
+  listMigrations, createMigration,
+  type MigJob, type CreateMigrationInput,
 } from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
+import ConstraintPicker from '../components/ConstraintPicker.vue'
 import { GAP } from '../layout'
 import PageHeader from '../components/PageHeader.vue'
 
@@ -20,9 +21,6 @@ const loading = ref(false)
 const showCreate = ref(false)
 const creating = ref(false)
 
-const templates = ref<ConstraintTemplate[]>([])
-const selectedTemplate = ref<string | null>(null)
-
 const form = ref<CreateMigrationInput>({
   name: '',
   repo_path: '',
@@ -31,6 +29,7 @@ const form = ref<CreateMigrationInput>({
   target_branch: '',
   constraints: '',
   constraint_template_id: '',
+  max_retries: 5,
 })
 
 const query = ref('')
@@ -60,26 +59,9 @@ const filteredJobs = computed(() => {
   })
 })
 
-const templateOptions = computed(() => templates.value.map((t) => ({ label: t.name, value: t.id })))
-const selectedTemplateContent = computed(() => {
-  const t = templates.value.find((t) => t.id === selectedTemplate.value)
-  return t ? concatTemplateContent(t) : ''
-})
-
 async function refresh() {
   loading.value = true
   try { jobs.value = await listMigrations() } catch (e: any) { message.error(e.message) } finally { loading.value = false }
-}
-
-async function loadTemplates() {
-  try { templates.value = await listConstraintTemplates() } catch { /* ignore */ }
-}
-
-function onTemplatePick(id: string | null) {
-  selectedTemplate.value = id
-  form.value.constraint_template_id = id ?? ''
-  // 用模板时清空内联文本，避免「引用模板 + 内联文本」并存造成歧义
-  if (id) form.value.constraints = ''
 }
 
 async function submit() {
@@ -95,7 +77,7 @@ async function submit() {
 function fmt(t: string) { return new Date(t).toLocaleString() }
 function go(id: string) { router.push('/migrations/' + id) }
 
-onMounted(() => { refresh(); loadTemplates() })
+onMounted(refresh)
 </script>
 
 <template>
@@ -149,18 +131,14 @@ onMounted(() => { refresh(); loadTemplates() })
         <n-form-item label="目标分支 *（从目标基底切出，接收 cherry-pick）">
           <n-input v-model:value="form.target_branch" placeholder="如 migrate/new-version" />
         </n-form-item>
-        <n-form-item label="约束模板（可选，AI 解决冲突时引用）">
-          <n-select v-model:value="selectedTemplate" :options="templateOptions" placeholder="选择一个已保存的模板，或留空用下方自定义文本" clearable @update:value="onTemplatePick" />
+        <n-form-item label="重试次数（冲突解决 / 回归修复的重试轮数）">
+          <n-input-number v-model:value="form.max_retries" :min="1" :max="10" />
         </n-form-item>
-        <n-form-item label="项目约束（可选，AI 解决冲突时带给 AI）">
-          <div style="width:100%">
-            <n-alert v-if="selectedTemplate" type="info" :bordered="false" style="margin-bottom:6px">
-              <span style="white-space:pre-wrap">已引用模板，内容（只读）：{{ selectedTemplateContent }}</span>
-            </n-alert>
-            <n-input v-else v-model:value="form.constraints" type="textarea" :rows="3"
-              placeholder="如：不引入第三方依赖 / 保持 Go 1.20 兼容 / 遵循某代码规范 / 不修改公共 API..." />
-          </div>
-        </n-form-item>
+        <ConstraintPicker
+          v-model:template-id="form.constraint_template_id"
+          v-model:constraints="form.constraints"
+          template-label="约束模板（可选，AI 解决冲突时引用）"
+          constraints-label="项目约束（可选，AI 解决冲突时带给 AI）" />
       </n-form>
       <template #footer>
         <n-space justify="end">

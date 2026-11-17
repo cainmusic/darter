@@ -3,10 +3,11 @@ import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   NButton, NCard, NEmpty, NGrid, NGridItem, NModal, NForm, NFormItem,
-  NInput, NInputNumber, NRadioGroup, NRadio, NSelect, NSpace, NSpin, NAlert, useMessage,
+  NInput, NInputNumber, NRadioGroup, NRadio, NSelect, NSpace, NSpin, useMessage,
 } from 'naive-ui'
-import { listJobs, createJob, listConstraintTemplates, createConstraintTemplate, concatTemplateContent, type Job, type CreateJobInput, type ConstraintTemplate } from '../api'
+import { listJobs, createJob, type Job, type CreateJobInput } from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
+import ConstraintPicker from '../components/ConstraintPicker.vue'
 import { GAP } from '../layout'
 import PageHeader from '../components/PageHeader.vue'
 
@@ -16,11 +17,6 @@ const jobs = ref<Job[]>([])
 const loading = ref(false)
 const showCreate = ref(false)
 const creating = ref(false)
-const templates = ref<ConstraintTemplate[]>([])
-const selectedTemplate = ref<string | null>(null)
-const showSaveTemplate = ref(false)
-const templateName = ref('')
-const savingTemplate = ref(false)
 
 const form = ref({
   name: '',
@@ -85,46 +81,10 @@ async function submit() {
   } catch (e: any) { message.error(e.message) } finally { creating.value = false }
 }
 
-const templateOptions = computed(() => templates.value.map((t) => ({ label: t.name, value: t.id })))
-const selectedTemplateContent = computed(() => {
-  const t = templates.value.find((t) => t.id === selectedTemplate.value)
-  return t ? concatTemplateContent(t) : ''
-})
-
-async function loadTemplates() {
-  try { templates.value = await listConstraintTemplates() } catch { /* ignore */ }
-}
-
-function onTemplatePick(id: string | null) {
-  selectedTemplate.value = id
-  form.value.constraint_template_id = id ?? ''
-  // 用模板时清空内联文本，避免「引用模板 + 内联文本」并存造成歧义
-  if (id) form.value.constraints = ''
-}
-
-function openSaveTemplate() {
-  if (!form.value.constraints.trim()) { message.warning('请先填写项目约束内容'); return }
-  templateName.value = ''
-  showSaveTemplate.value = true
-}
-
-async function confirmSaveTemplate() {
-  const name = templateName.value.trim()
-  if (!name) { message.warning('请输入模板名称'); return }
-  savingTemplate.value = true
-  try {
-    const t = await createConstraintTemplate(name, [{ id: 'm0', name: '内容', content: form.value.constraints }])
-    templates.value.push(t)
-    selectedTemplate.value = t.id
-    message.success('已保存为模板')
-    showSaveTemplate.value = false
-  } catch (e: any) { message.error(e.message) } finally { savingTemplate.value = false }
-}
-
 function fmt(t: string) { return new Date(t).toLocaleString() }
 function go(id: string) { router.push('/jobs/' + id) }
 
-onMounted(() => { refresh(); loadTemplates() })
+onMounted(refresh)
 </script>
 
 <template>
@@ -181,21 +141,11 @@ onMounted(() => { refresh(); loadTemplates() })
           <n-input v-if="form.report_type === 'file'" v-model:value="form.report_value" placeholder="/path/to/report.md" />
           <n-input v-else v-model:value="form.report_value" type="textarea" :rows="8" placeholder="粘贴 review 报告..." />
         </n-form-item>
-        <n-form-item label="约束模板（可选，选中后引用该模板，约束随模板更新）">
-          <n-select v-model:value="selectedTemplate" :options="templateOptions" placeholder="选择一个已保存的模板，或留空使用下方自定义文本" clearable @update:value="onTemplatePick" />
-        </n-form-item>
-        <n-form-item label="项目约束（可选，修复时带给 AI）">
-          <div style="width:100%">
-            <n-alert v-if="selectedTemplate" type="info" :bordered="false" style="margin-bottom:6px">
-              <span style="white-space:pre-wrap">已引用模板，内容（只读）：{{ selectedTemplateContent }}</span>
-            </n-alert>
-            <n-input v-else v-model:value="form.constraints" type="textarea" :rows="3"
-              placeholder="如：不引入第三方依赖 / 保持 Go 1.20 兼容 / 遵循某代码规范 / 不修改公共 API..." />
-            <div v-if="!selectedTemplate" style="margin-top:6px;text-align:right">
-              <n-button size="tiny" @click="openSaveTemplate">将当前约束保存为模板</n-button>
-            </div>
-          </div>
-        </n-form-item>
+        <ConstraintPicker
+          v-model:template-id="form.constraint_template_id"
+          v-model:constraints="form.constraints"
+          template-label="约束模板（可选，选中后引用该模板，约束随模板更新）"
+          constraints-label="项目约束（可选，修复时带给 AI）" />
         <n-form-item label="最大重试次数">
           <n-input-number v-model:value="form.max_retries" :min="1" :max="10" />
         </n-form-item>
@@ -204,20 +154,6 @@ onMounted(() => { refresh(); loadTemplates() })
         <n-space justify="end">
           <n-button @click="showCreate = false">取消</n-button>
           <n-button type="primary" :loading="creating" @click="submit">创建</n-button>
-        </n-space>
-      </template>
-    </n-modal>
-
-    <n-modal v-model:show="showSaveTemplate" preset="card" title="保存为约束模板" style="max-width:420px">
-      <n-form label-placement="top">
-        <n-form-item label="模板名称 *">
-          <n-input v-model:value="templateName" placeholder="如：Go 项目通用约束" />
-        </n-form-item>
-      </n-form>
-      <template #footer>
-        <n-space justify="end">
-          <n-button @click="showSaveTemplate = false">取消</n-button>
-          <n-button type="primary" :loading="savingTemplate" @click="confirmSaveTemplate">保存</n-button>
         </n-space>
       </template>
     </n-modal>

@@ -70,6 +70,7 @@ func (a *App) createMigration(w http.ResponseWriter, r *http.Request) {
 		TargetBranch         string `json:"target_branch"`
 		Constraints          string `json:"constraints"`
 		ConstraintTemplateID string `json:"constraint_template_id"`
+		MaxRetries           int    `json:"max_retries"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, 400, "请求体解析失败: "+err.Error())
@@ -105,13 +106,18 @@ func (a *App) createMigration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	maxRetries := req.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 5
+	}
+
 	j := &job.Job{
 		ID:                   fmt.Sprintf("mig_%s_%s", time.Now().Format("20060102-150405"), randSuffix()),
 		Kind:                 job.KindMigration,
 		Name:                 req.Name,
 		RepoPath:             req.RepoPath,
 		Status:               job.MigStatusReady,
-		Migration:            &job.MigrationSpec{SourceBranch: req.SourceBranch, TargetBase: req.TargetBase, TargetBranch: req.TargetBranch},
+		Migration:            &job.MigrationSpec{SourceBranch: req.SourceBranch, TargetBase: req.TargetBase, TargetBranch: req.TargetBranch, MaxRetries: maxRetries},
 		Constraints:          req.Constraints,
 		ConstraintTemplateID: req.ConstraintTemplateID,
 		ClaudeCmd:            a.settings.ClaudeCmd,
@@ -958,7 +964,10 @@ func (a *App) resolveConflictWithAI(ctx context.Context, g *git.Service, j *job.
 
 	recordAttempt("AI 开始尝试解决冲突")
 
-	const maxAttempts = 3
+	maxAttempts := j.Migration.MaxRetries
+	if maxAttempts <= 0 {
+		maxAttempts = 5
+	}
 	var lastErr error
 	var feedback string
 	var summary string
@@ -1456,10 +1465,14 @@ func (a *App) runMigrationRegression(j *job.Job) {
 		return
 	}
 
-	// 有问题：最多 3 轮「修复 → 提交独立 commit → 审查」。
+	// 有问题：走「修复 → 提交独立 commit → 审查」循环，重试次数用迁移任务的 max_retries（默认 5）。
 	// 每轮修复单独提交 commit（不 amend 到迁移 commit，来源可能不同，便于后续评估合并）。
 	feedback := findingsText(review.Findings)
-	for attempt := 1; attempt <= 3; attempt++ {
+	maxAttempts := j.Migration.MaxRetries
+	if maxAttempts <= 0 {
+		maxAttempts = 5
+	}
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		if ctx.Err() == context.Canceled {
 			return
 		}

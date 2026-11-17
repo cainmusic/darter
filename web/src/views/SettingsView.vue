@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { NButton, NCard, NForm, NFormItem, NInput, NInputNumber, NSelect, NSpace, NAlert, useMessage, type SelectOption } from 'naive-ui'
+import { NButton, NCard, NForm, NFormItem, NInput, NSelect, NSpace, NAlert, useMessage, type SelectOption } from 'naive-ui'
 import { getSettings, saveSettings, type Settings } from '../api'
 import { currentTheme, applyTheme, type ThemeId } from '../theme'
 import PageHeader from '../components/PageHeader.vue'
 
 const message = useMessage()
-const form = ref<Settings>({ claude_cmd: 'claude', claude_model: '', default_retries: 3 })
+const form = ref<Settings>({ claude_cmd: 'claude', claude_model: '' })
 const saving = ref(false)
 
 const themeOptions: SelectOption[] = [
@@ -53,7 +53,7 @@ onMounted(load)
     <n-card class="cy-card">
       <n-alert type="info" :bordered="false" style="margin-bottom:12px">
         <div style="font-size:12px;line-height:1.6">
-          以下配置会在<strong>创建修复任务时</strong>固化到该任务里（claude 命令 → claude_cmd、claude model → claude_model、默认重试次数 → max_retries）。
+          以下配置会在<strong>创建任务时</strong>固化到该任务里（claude 命令 → claude_cmd、claude model → claude_model）。
           之后修改这些设置<strong>只对新建的任务生效</strong>，不影响已存在的任务；如需改动已有任务，请手动编辑其 job.json。
         </div>
       </n-alert>
@@ -63,9 +63,6 @@ onMounted(load)
         </n-form-item>
         <n-form-item label="claude model">
           <n-input v-model:value="form.claude_model" placeholder="留空用默认（如 opus/sonnet）" />
-        </n-form-item>
-        <n-form-item label="默认重试次数">
-          <n-input-number v-model:value="form.default_retries" :min="1" :max="10" />
         </n-form-item>
       </n-form>
       <n-space justify="end" style="margin-top:8px">

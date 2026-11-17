@@ -82,7 +82,6 @@ export interface Evt {
 export interface Settings {
   claude_cmd: string
   claude_model: string
-  default_retries: number
 }
 
 export interface JobDetail { job: Job; tasks: Task[] }
@@ -224,6 +223,7 @@ export interface MigrationSpec {
   target_branch: string
   start_commit?: string
   end_commit?: string
+  max_retries?: number
 }
 
 export interface MigJob {
@@ -292,6 +292,7 @@ export interface CreateMigrationInput {
   target_branch: string
   constraints?: string
   constraint_template_id?: string
+  max_retries?: number
 }
 
 export const listMigrations = () => api<MigJob[]>('/api/migrations')

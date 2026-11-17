@@ -172,9 +172,8 @@ func (s *Store) LoadEvents(jobID string) ([]events.Event, error) {
 }
 
 type Settings struct {
-	ClaudeCmd      string `json:"claude_cmd"`
-	ClaudeModel    string `json:"claude_model"`
-	DefaultRetries int    `json:"default_retries"`
+	ClaudeCmd   string `json:"claude_cmd"`
+	ClaudeModel string `json:"claude_model"`
 }
 
 func (s *Store) LoadSettings() (Settings, error) {
@@ -182,13 +181,10 @@ func (s *Store) LoadSettings() (Settings, error) {
 	defer s.mu.Unlock()
 	var st Settings
 	if err := readJSON(filepath.Join(s.base, "settings.json"), &st); err != nil {
-		return Settings{ClaudeCmd: "claude", DefaultRetries: 3}, nil
+		return Settings{ClaudeCmd: "claude"}, nil
 	}
 	if st.ClaudeCmd == "" {
 		st.ClaudeCmd = "claude"
-	}
-	if st.DefaultRetries <= 0 {
-		st.DefaultRetries = 3
 	}
 	return st, nil
 }

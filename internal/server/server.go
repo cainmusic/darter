@@ -284,9 +284,6 @@ func (a *App) createJob(w http.ResponseWriter, r *http.Request) {
 
 	retries := req.MaxRetries
 	if retries <= 0 {
-		retries = a.settings.DefaultRetries
-	}
-	if retries <= 0 {
 		retries = 3
 	}
 
