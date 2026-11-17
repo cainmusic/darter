@@ -1,0 +1,471 @@
+/* ============ 主题变量 ============ */
+/* 默认赛博主题定义在 :root；其余主题通过 html[data-theme=...] 覆盖。
+   字体与派生色（*-bg）对所有主题通用，派生色用 color-mix 懒解析，自动跟随主题主色切换。 */
+
+:root {
+  --font-display: 'Orbitron', 'PingFang SC', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'PingFang SC', monospace;
+
+  /* 赛博 Cyber（默认） */
+  --cy-bg: #05070d;
+  --cy-panel: #0a0f1a;
+  --cy-panel-2: #0d1420;
+  --cy-border: #1a2333;
+  --cy-cyan: #00f0ff;
+  --cy-green: #00ff9c;
+  --cy-amber: #ffb000;
+  --cy-red: #ff2d55;
+  --cy-skip: #9a86ff;
+  --cy-deferred: #8aa0c0;
+  --cy-suggestion: #ff5c8a;
+  --cy-text: #c8d6e5;
+  --cy-muted: #6b7a90;
+  --cy-code-bg: #070b12;
+  --cy-terminal-bg: #04060a;
+  --cy-diff-add-bg: rgba(0, 255, 156, 0.12);
+  --cy-diff-add-text: #7dffc0;
+  --cy-diff-del-bg: rgba(255, 45, 85, 0.12);
+  --cy-diff-del-text: #ff8ba0;
+  --cy-glow-cyan: 0 0 8px rgba(0, 240, 255, 0.7);
+  --cy-glow-green: 0 0 8px rgba(0, 255, 156, 0.7);
+  --cy-tag-glow: 0 0 6px rgba(0, 240, 255, 0.20);
+  --cy-scanline: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 240, 255, 0.015) 3px,
+    rgba(0, 0, 0, 0) 4px
+  );
+}
+
+html[data-theme="light"] {
+  --cy-bg: #f5f6f8;
+  --cy-panel: #ffffff;
+  --cy-panel-2: #eef1f5;
+  --cy-border: #e2e6ec;
+  --cy-cyan: #2563eb;
+  --cy-green: #16a34a;
+  --cy-amber: #d97706;
+  --cy-red: #dc2626;
+  --cy-skip: #7c3aed;
+  --cy-deferred: #64748b;
+  --cy-suggestion: #db2777;
+  --cy-text: #1f2937;
+  --cy-muted: #6b7280;
+  --cy-code-bg: #ffffff;
+  --cy-terminal-bg: #ffffff;
+  --cy-diff-add-bg: rgba(22, 163, 74, 0.12);
+  --cy-diff-add-text: #15803d;
+  --cy-diff-del-bg: rgba(220, 38, 38, 0.12);
+  --cy-diff-del-text: #b91c1c;
+  --cy-glow-cyan: none;
+  --cy-glow-green: none;
+  --cy-tag-glow: none;
+  --cy-scanline: none;
+}
+
+html[data-theme="dark"] {
+  --cy-bg: #0d1117;
+  --cy-panel: #161b22;
+  --cy-panel-2: #1c2128;
+  --cy-border: #30363d;
+  --cy-cyan: #58a6ff;
+  --cy-green: #3fb950;
+  --cy-amber: #d29922;
+  --cy-red: #f85149;
+  --cy-skip: #a371f7;
+  --cy-deferred: #9db2d0;
+  --cy-suggestion: #f778ba;
+  --cy-text: #c9d1d9;
+  --cy-muted: #8b949e;
+  --cy-code-bg: #0d1117;
+  --cy-terminal-bg: #0d1117;
+  --cy-diff-add-bg: rgba(63, 185, 80, 0.15);
+  --cy-diff-add-text: #7ee787;
+  --cy-diff-del-bg: rgba(248, 81, 73, 0.15);
+  --cy-diff-del-text: #ffa198;
+  --cy-glow-cyan: none;
+  --cy-glow-green: none;
+  --cy-tag-glow: none;
+  --cy-scanline: none;
+}
+
+html[data-theme="sepia"] {
+  --cy-bg: #f4ecd8;
+  --cy-panel: #faf3e3;
+  --cy-panel-2: #f0e6d0;
+  --cy-border: #e0d5bd;
+  --cy-cyan: #9c6b3f;
+  --cy-green: #6b8f3b;
+  --cy-amber: #b8860b;
+  --cy-red: #c0392b;
+  --cy-skip: #7d6a9d;
+  --cy-deferred: #7b8a9c;
+  --cy-suggestion: #b2537a;
+  --cy-text: #3b3226;
+  --cy-muted: #8a7a5e;
+  --cy-code-bg: #faf3e3;
+  --cy-terminal-bg: #faf3e3;
+  --cy-diff-add-bg: rgba(107, 143, 59, 0.15);
+  --cy-diff-add-text: #4d6b2a;
+  --cy-diff-del-bg: rgba(192, 57, 43, 0.15);
+  --cy-diff-del-text: #8c2f24;
+  --cy-glow-cyan: none;
+  --cy-glow-green: none;
+  --cy-tag-glow: none;
+  --cy-scanline: none;
+}
+
+html[data-theme="dracula"] {
+  --cy-bg: #282a36;
+  --cy-panel: #21222c;
+  --cy-panel-2: #1d1e26;
+  --cy-border: #44475a;
+  --cy-cyan: #bd93f9;
+  --cy-green: #50fa7b;
+  --cy-amber: #f1fa8c;
+  --cy-red: #ff5555;
+  --cy-skip: #ff79c6;
+  --cy-deferred: #6272a4;
+  --cy-suggestion: #8be9fd;
+  --cy-text: #f8f8f2;
+  --cy-muted: #6272a4;
+  --cy-code-bg: #1e1f29;
+  --cy-terminal-bg: #21222c;
+  --cy-diff-add-bg: rgba(80, 250, 123, 0.15);
+  --cy-diff-add-text: #a6ffc5;
+  --cy-diff-del-bg: rgba(255, 85, 85, 0.15);
+  --cy-diff-del-text: #ff9d9d;
+  --cy-glow-cyan: 0 0 8px rgba(189, 147, 249, 0.7);
+  --cy-glow-green: 0 0 8px rgba(80, 250, 123, 0.7);
+  --cy-tag-glow: 0 0 6px rgba(189, 147, 249, 0.20);
+  --cy-scanline: none;
+}
+
+html[data-theme="tokyo-night"] {
+  --cy-bg: #1a1b26;
+  --cy-panel: #16161e;
+  --cy-panel-2: #1f2335;
+  --cy-border: #3b4261;
+  --cy-cyan: #7aa2f7;
+  --cy-green: #9ece6a;
+  --cy-amber: #e0af68;
+  --cy-red: #f7768e;
+  --cy-skip: #bb9af7;
+  --cy-deferred: #565f89;
+  --cy-suggestion: #7dcfff;
+  --cy-text: #c0caf5;
+  --cy-muted: #565f89;
+  --cy-code-bg: #16161e;
+  --cy-terminal-bg: #1a1b26;
+  --cy-diff-add-bg: rgba(158, 206, 106, 0.15);
+  --cy-diff-add-text: #b9f27c;
+  --cy-diff-del-bg: rgba(247, 118, 142, 0.15);
+  --cy-diff-del-text: #ff9eae;
+  --cy-glow-cyan: 0 0 8px rgba(122, 162, 247, 0.7);
+  --cy-glow-green: 0 0 8px rgba(158, 206, 106, 0.7);
+  --cy-tag-glow: 0 0 6px rgba(122, 162, 247, 0.20);
+  --cy-scanline: none;
+}
+
+html[data-theme="synthwave"] {
+  --cy-bg: #2b0f3a;
+  --cy-panel: #1f0a2e;
+  --cy-panel-2: #240d33;
+  --cy-border: #4a1d6b;
+  --cy-cyan: #ff2d95;
+  --cy-green: #ffb000;
+  --cy-amber: #ffd166;
+  --cy-red: #ff3860;
+  --cy-skip: #b967ff;
+  --cy-deferred: #8a7fa8;
+  --cy-suggestion: #00e5ff;
+  --cy-text: #f5e6ff;
+  --cy-muted: #a08bb0;
+  --cy-code-bg: #1a0826;
+  --cy-terminal-bg: #1f0a2e;
+  --cy-diff-add-bg: rgba(255, 176, 0, 0.15);
+  --cy-diff-add-text: #ffd166;
+  --cy-diff-del-bg: rgba(255, 56, 96, 0.15);
+  --cy-diff-del-text: #ff8ba0;
+  --cy-glow-cyan: 0 0 8px rgba(255, 45, 149, 0.7);
+  --cy-glow-green: 0 0 8px rgba(255, 176, 0, 0.7);
+  --cy-tag-glow: 0 0 6px rgba(255, 45, 149, 0.20);
+  --cy-scanline: none;
+}
+
+html[data-theme="matrix"] {
+  --cy-bg: #020a02;
+  --cy-panel: #051005;
+  --cy-panel-2: #0a1508;
+  --cy-border: #0f3d1f;
+  --cy-cyan: #00ff41;
+  --cy-green: #7dffb0;
+  --cy-amber: #c6ff00;
+  --cy-red: #ff003c;
+  --cy-skip: #00e5ff;
+  --cy-deferred: #3a7d44;
+  --cy-suggestion: #b3ff00;
+  --cy-text: #c8ffd4;
+  --cy-muted: #3a7d44;
+  --cy-code-bg: #010501;
+  --cy-terminal-bg: #020a02;
+  --cy-diff-add-bg: rgba(0, 255, 65, 0.15);
+  --cy-diff-add-text: #7dffb0;
+  --cy-diff-del-bg: rgba(255, 0, 60, 0.15);
+  --cy-diff-del-text: #ff8ba0;
+  --cy-glow-cyan: 0 0 8px rgba(0, 255, 65, 0.7);
+  --cy-glow-green: 0 0 8px rgba(125, 255, 176, 0.7);
+  --cy-tag-glow: 0 0 6px rgba(0, 255, 65, 0.20);
+  --cy-scanline: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 255, 65, 0.02) 3px,
+    rgba(0, 0, 0, 0) 4px
+  );
+}
+
+html[data-theme="nord"] {
+  --cy-bg: #2e3440;
+  --cy-panel: #3b4252;
+  --cy-panel-2: #434c5e;
+  --cy-border: #4c566a;
+  --cy-cyan: #88c0d0;
+  --cy-green: #a3be8c;
+  --cy-amber: #ebcb8b;
+  --cy-red: #bf616a;
+  --cy-skip: #b48ead;
+  --cy-deferred: #616e88;
+  --cy-suggestion: #81a1c1;
+  --cy-text: #eceff4;
+  --cy-muted: #616e88;
+  --cy-code-bg: #2e3440;
+  --cy-terminal-bg: #2e3440;
+  --cy-diff-add-bg: rgba(163, 190, 140, 0.15);
+  --cy-diff-add-text: #c3d6a9;
+  --cy-diff-del-bg: rgba(191, 97, 106, 0.15);
+  --cy-diff-del-text: #d8a0a6;
+  --cy-glow-cyan: none;
+  --cy-glow-green: none;
+  --cy-tag-glow: none;
+  --cy-scanline: none;
+}
+
+html[data-theme="gruvbox"] {
+  --cy-bg: #282828;
+  --cy-panel: #3c3836;
+  --cy-panel-2: #504945;
+  --cy-border: #665c54;
+  --cy-cyan: #fabd2f;
+  --cy-green: #b8bb26;
+  --cy-amber: #fe8019;
+  --cy-red: #fb4934;
+  --cy-skip: #d3869b;
+  --cy-deferred: #928374;
+  --cy-suggestion: #83a598;
+  --cy-text: #ebdbb2;
+  --cy-muted: #928374;
+  --cy-code-bg: #1d2021;
+  --cy-terminal-bg: #1d2021;
+  --cy-diff-add-bg: rgba(184, 187, 38, 0.15);
+  --cy-diff-add-text: #d4d98c;
+  --cy-diff-del-bg: rgba(251, 73, 52, 0.15);
+  --cy-diff-del-text: #ff9d8b;
+  --cy-glow-cyan: none;
+  --cy-glow-green: none;
+  --cy-tag-glow: none;
+  --cy-scanline: none;
+}
+
+html[data-theme="catppuccin-latte"] {
+  --cy-bg: #eff1f5;
+  --cy-panel: #ffffff;
+  --cy-panel-2: #e6e9ef;
+  --cy-border: #dce0e8;
+  --cy-cyan: #1e66f5;
+  --cy-green: #40a02b;
+  --cy-amber: #df8e1d;
+  --cy-red: #d20f39;
+  --cy-skip: #8839ef;
+  --cy-deferred: #8c8fa1;
+  --cy-suggestion: #ea76cb;
+  --cy-text: #4c4f69;
+  --cy-muted: #6c6f85;
+  --cy-code-bg: #ffffff;
+  --cy-terminal-bg: #ffffff;
+  --cy-diff-add-bg: rgba(64, 160, 43, 0.15);
+  --cy-diff-add-text: #40a02b;
+  --cy-diff-del-bg: rgba(210, 15, 57, 0.15);
+  --cy-diff-del-text: #d20f39;
+  --cy-glow-cyan: none;
+  --cy-glow-green: none;
+  --cy-tag-glow: none;
+  --cy-scanline: none;
+}
+
+html[data-theme="rose-pine-dawn"] {
+  --cy-bg: #faf4ed;
+  --cy-panel: #fffaf3;
+  --cy-panel-2: #f2e9e1;
+  --cy-border: #dfdad9;
+  --cy-cyan: #b4637a;
+  --cy-green: #56949f;
+  --cy-amber: #ea9d34;
+  --cy-red: #d7827e;
+  --cy-skip: #907aa9;
+  --cy-deferred: #9893a5;
+  --cy-suggestion: #9ccfd8;
+  --cy-text: #575279;
+  --cy-muted: #797593;
+  --cy-code-bg: #fffaf3;
+  --cy-terminal-bg: #faf4ed;
+  --cy-diff-add-bg: rgba(86, 148, 159, 0.15);
+  --cy-diff-add-text: #56949f;
+  --cy-diff-del-bg: rgba(215, 130, 126, 0.15);
+  --cy-diff-del-text: #d7827e;
+  --cy-glow-cyan: none;
+  --cy-glow-green: none;
+  --cy-tag-glow: none;
+  --cy-scanline: none;
+}
+
+html[data-theme="everforest-light"] {
+  --cy-bg: #fdf6e3;
+  --cy-panel: #fffbef;
+  --cy-panel-2: #f2efdf;
+  --cy-border: #e0dcc7;
+  --cy-cyan: #3a94c5;
+  --cy-green: #8da101;
+  --cy-amber: #dfa000;
+  --cy-red: #f85552;
+  --cy-skip: #df69ba;
+  --cy-deferred: #829181;
+  --cy-suggestion: #35a77c;
+  --cy-text: #5c6a72;
+  --cy-muted: #829181;
+  --cy-code-bg: #fffbef;
+  --cy-terminal-bg: #fdf6e3;
+  --cy-diff-add-bg: rgba(141, 161, 1, 0.15);
+  --cy-diff-add-text: #8da101;
+  --cy-diff-del-bg: rgba(248, 85, 82, 0.15);
+  --cy-diff-del-text: #f85552;
+  --cy-glow-cyan: none;
+  --cy-glow-green: none;
+  --cy-tag-glow: none;
+  --cy-scanline: none;
+}
+
+/* 派生色：由主题主色 color-mix 得到半透明底色（懒解析，自动跟随主题） */
+:root {
+  --cy-cyan-bg: color-mix(in srgb, var(--cy-cyan) 12%, transparent);
+  --cy-green-bg: color-mix(in srgb, var(--cy-green) 12%, transparent);
+  --cy-amber-bg: color-mix(in srgb, var(--cy-amber) 14%, transparent);
+  --cy-red-bg: color-mix(in srgb, var(--cy-red) 12%, transparent);
+  --cy-muted-bg: color-mix(in srgb, var(--cy-muted) 16%, transparent);
+  --cy-skip-bg: color-mix(in srgb, var(--cy-skip) 12%, transparent);
+  --cy-deferred-bg: color-mix(in srgb, var(--cy-deferred) 12%, transparent);
+  --cy-suggestion-bg: color-mix(in srgb, var(--cy-suggestion) 14%, transparent);
+  --cy-selected-bg: color-mix(in srgb, var(--cy-cyan) 7%, transparent);
+  --cy-hover-bg: color-mix(in srgb, var(--cy-text) 5%, transparent);
+  --cy-findings-bg: color-mix(in srgb, var(--cy-red) 8%, transparent);
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--cy-bg);
+  color: var(--cy-text);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 全局扫描线遮罩（非赛博主题下 --cy-scanline 为 none，自动隐藏） */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: var(--cy-scanline);
+}
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: var(--cy-bg); }
+::-webkit-scrollbar-thumb { background: var(--cy-cyan); border-radius: 2px; }
+
+/* 展示字体 */
+.font-display { font-family: var(--font-display); letter-spacing: 0.06em; }
+
+/* 霓虹发光（非赛博主题下为 none） */
+.glow-cyan { text-shadow: var(--cy-glow-cyan); color: var(--cy-cyan); }
+.glow-green { text-shadow: var(--cy-glow-green); color: var(--cy-green); }
+
+/* 进行中标记的呼吸点 */
+.pulse-dot { animation: pulse-dot 1.2s ease-in-out infinite; }
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+/* 卡片 */
+.cy-card {
+  background: linear-gradient(160deg, var(--cy-panel) 0%, var(--cy-panel-2) 100%);
+  border: 1px solid var(--cy-border);
+  border-radius: 6px;
+  position: relative;
+}
+.cy-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cy-cyan), transparent);
+  opacity: 0.5;
+}
+
+/* 面板标题角标 */
+.cy-title {
+  font-family: var(--font-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cy-cyan);
+  font-size: 13px;
+}
+
+/* diff 高亮 */
+.diff-add { background: var(--cy-diff-add-bg); color: var(--cy-diff-add-text); }
+.diff-del { background: var(--cy-diff-del-bg); color: var(--cy-diff-del-text); }
+.diff-meta { color: var(--cy-muted); }
+
+.code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+  padding: 12px;
+  background: var(--cy-code-bg);
+  border: 1px solid var(--cy-border);
+  border-radius: 4px;
+  overflow: auto;
+}
+
+/* xterm 容器（背景跟随主题，与终端内部背景一致） */
+.terminal-wrap {
+  height: 100%;
+  padding: 8px 10px;
+  overflow: hidden;
+  background: var(--cy-terminal-bg);
+  border: 1px solid var(--cy-border);
+  border-radius: 4px;
+}
