@@ -310,11 +310,15 @@ function onThemePick(v: unknown) {
               <div class="logo font-display" style="font-size:22px;padding:0 8px 16px;text-align:center">
                 <template v-if="!siderCollapsed">
                   <span class="glow-cyan">DART</span><span class="glow-green">ER</span>
-                  <div style="font-size:10px;color:var(--cy-muted);letter-spacing:0.2em;margin-top:2px">GET THINGS DONE</div>
                 </template>
                 <template v-else>
                   <span class="glow-cyan">D</span>
                 </template>
+                <!-- 第二行：固定高度，展开显示标语（不换行、逐渐露出），折叠用六向礼花图标占位保持高度 -->
+                <div style="height:14px;margin-top:2px;overflow:hidden">
+                  <div v-if="!siderCollapsed" style="font-size:10px;color:var(--cy-muted);letter-spacing:0.2em;line-height:14px;white-space:nowrap;text-align:center">GET THINGS DONE</div>
+                  <div v-else style="height:14px;display:flex;align-items:center;justify-content:center;color:var(--cy-muted);font-size:12px;line-height:1">✻</div>
+                </div>
               </div>
               <n-menu :value="activeKey" :options="menuOptions" :collapsed="siderCollapsed"
                 :collapsed-width="64" :collapsed-icon-size="20" style="flex:1;min-height:0" @update:value="onMenu" />
