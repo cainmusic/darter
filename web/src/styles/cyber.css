@@ -469,3 +469,51 @@ body::after {
   border: 1px solid var(--cy-border);
   border-radius: 4px;
 }
+
+/* 沉浸式（全屏）切换按钮：文字「深入/浅出」+ 四角符号向外/向内 */
+.immersive-btn {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0 11px;
+  cursor: pointer;
+  color: var(--cy-muted);
+  border-top: 1px solid var(--cy-border);
+  user-select: none;
+}
+.immersive-btn:hover { color: var(--cy-cyan); }
+.immersive-btn .immersive-text {
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  margin-right: -0.3em; /* 抵消末字符的 letter-spacing，保证视觉居中 */
+}
+.immersive-btn .corner {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  transition: all 0.2s ease;
+}
+/* 向外（深入）：顶点朝四角（┌ ┐ └ ┘） */
+.immersive-btn .corner-tl { top: 5px; left: 10px; border-top: 1.5px solid currentColor; border-left: 1.5px solid currentColor; }
+.immersive-btn .corner-tr { top: 5px; right: 10px; border-top: 1.5px solid currentColor; border-right: 1.5px solid currentColor; }
+.immersive-btn .corner-bl { bottom: 7px; left: 10px; border-bottom: 1.5px solid currentColor; border-left: 1.5px solid currentColor; }
+.immersive-btn .corner-br { bottom: 7px; right: 10px; border-bottom: 1.5px solid currentColor; border-right: 1.5px solid currentColor; }
+/* 向内（浅出）：仅顶点朝中心（方向镜像），位置不变 */
+.immersive-btn.active .corner-tl {
+  border-top: none; border-left: none;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+}
+.immersive-btn.active .corner-tr {
+  border-top: none; border-right: none;
+  border-left: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+}
+.immersive-btn.active .corner-bl {
+  border-bottom: none; border-left: none;
+  border-right: 1.5px solid currentColor; border-top: 1.5px solid currentColor;
+}
+.immersive-btn.active .corner-br {
+  border-bottom: none; border-right: none;
+  border-left: 1.5px solid currentColor; border-top: 1.5px solid currentColor;
+}

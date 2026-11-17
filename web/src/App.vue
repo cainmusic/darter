@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, h, type VNode } from 'vue'
+import { onMounted, onBeforeUnmount, computed, ref, h, type VNode } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   NConfigProvider, NMessageProvider, NDialogProvider, NLayout, NLayoutSider,
@@ -131,6 +131,30 @@ const naiveTheme = computed(() => (palettes[currentTheme.value].isDark ? darkThe
 const naiveOverrides = computed(() => buildOverrides(palettes[currentTheme.value]))
 
 const siderCollapsed = ref(false)
+// 沉浸式（浏览器全屏）：网页撑满全屏；按钮文字「深入/浅出」+ 四角符号向外/向内
+const immersive = ref(false)
+// 按钮文字：展开「深入/浅出」，折叠「入/出」
+const immersiveLabel = computed(() => {
+  const word = immersive.value ? '浅出' : '深入'
+  return siderCollapsed.value ? word.slice(1) : word
+})
+
+async function toggleImmersive() {
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen()
+    } else {
+      await document.documentElement.requestFullscreen()
+    }
+  } catch { /* ignore */ }
+}
+
+function onFullscreenChange() {
+  immersive.value = !!document.fullscreenElement
+}
+
+onMounted(() => document.addEventListener('fullscreenchange', onFullscreenChange))
+onBeforeUnmount(() => document.removeEventListener('fullscreenchange', onFullscreenChange))
 
 // 菜单图标：内联 SVG（stroke 风格，跟随 currentColor），项目未引入图标库
 function strokeIcon(children: VNode[]) {
@@ -294,6 +318,13 @@ function onThemePick(v: unknown) {
               </div>
               <n-menu :value="activeKey" :options="menuOptions" :collapsed="siderCollapsed"
                 :collapsed-width="64" :collapsed-icon-size="20" style="flex:1;min-height:0" @update:value="onMenu" />
+              <div class="immersive-btn" :class="{ active: immersive }" @click="toggleImmersive" title="进入/退出全屏">
+                <span class="corner corner-tl"></span>
+                <span class="corner corner-tr"></span>
+                <span class="corner corner-bl"></span>
+                <span class="corner corner-br"></span>
+                <span class="immersive-text">{{ immersiveLabel }}</span>
+              </div>
               <n-popover trigger="manual" :show="showThemePicker" placement="top" :show-arrow="true" @clickoutside="showThemePicker = false">
                 <template #trigger>
                   <div style="flex-shrink:0;display:flex;justify-content:center;padding:12px 0 6px;border-top:1px solid var(--cy-border);cursor:pointer" title="单击切换配色 / 长按选择配色"
