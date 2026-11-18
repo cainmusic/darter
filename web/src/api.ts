@@ -231,6 +231,8 @@ export interface MigJob {
   kind: string
   name: string
   repo_path: string
+  constraints?: string
+  constraint_template_id?: string
   status: MigStatus
   migration: MigrationSpec
   regression?: Review

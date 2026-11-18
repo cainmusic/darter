@@ -9,8 +9,8 @@ import {
   getMigration, migrateCommit, migrateRange, resolveMigrationConflict,
   aiResolveMigrationConflict, cancelAiResolveConflict, autoMigrate, cancelAutoMigrate, regressionMigration, resetMigrationTarget, completeMigration,
   setMigrationCommitMark, ignoreMigrationCommit, ignoreMigrationRange, mergeMigrationCommits, setMigrationCommitTarget,
-  listAiActivity,
-  type MigrationDetail, type CommitEntry, type CommitState, type CommitInfo, type ConflictRecord,
+  listAiActivity, listConstraintTemplates, updateJobConstraints, concatTemplateContent,
+  type MigrationDetail, type CommitEntry, type CommitState, type CommitInfo, type ConflictRecord, type ConstraintTemplate,
 } from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
 import AiActivityButton from '../components/AiActivityButton.vue'
@@ -46,6 +46,50 @@ function openCommitDetail(c: { hash: string; subject: string; message: string; a
 
 const startHash = ref<string | null>(null)
 const conflictNote = ref('')
+
+// 约束：查看/更换任务约束（同审查修复，支持引用模板或内联文本；任务进行中更换在后续 AI 调用生效）
+const showConstraint = ref(false)
+const constraintTemplates = ref<ConstraintTemplate[]>([])
+const constraintTemplateId = ref<string | null>(null)
+const constraintText = ref('')
+const savingConstraint = ref(false)
+
+const constraintTemplateOptions = computed(() =>
+  constraintTemplates.value.map((t) => ({ label: t.name, value: t.id })),
+)
+const currentConstraintTemplate = computed(() =>
+  constraintTemplates.value.find((t) => t.id === constraintTemplateId.value) ?? null,
+)
+
+async function openConstraint() {
+  if (!job.value) return
+  constraintTemplateId.value = job.value.constraint_template_id || null
+  constraintText.value = job.value.constraints || ''
+  showConstraint.value = true
+  if (!constraintTemplates.value.length) {
+    try { constraintTemplates.value = await listConstraintTemplates() } catch { /* ignore */ }
+  }
+}
+
+function onConstraintTemplatePick(id: string | null) {
+  constraintTemplateId.value = id
+  // 用模板时清空内联文本，避免「引用模板 + 内联文本」并存造成歧义
+  if (id) constraintText.value = ''
+}
+
+async function saveConstraint() {
+  if (!job.value) return
+  savingConstraint.value = true
+  try {
+    await updateJobConstraints(id, {
+      constraint_template_id: constraintTemplateId.value ?? '',
+      constraints: constraintText.value,
+    })
+    await refresh()
+    message.success('已更新约束')
+    showConstraint.value = false
+  } catch (e: any) { message.error(e.message) } finally { savingConstraint.value = false }
+}
 
 let pollTimer: number | undefined
 let es: EventSource | null = null
@@ -656,6 +700,7 @@ onBeforeUnmount(() => {
             {{ runningLabel }}
           </span>
           <n-button size="small" @click="refresh">刷新</n-button>
+          <n-button size="small" @click="openConstraint">约束</n-button>
           <n-button size="small" @click="showAiHistory = true">AI 处理历史</n-button>
           <AiActivityButton :job-id="id" />
           <n-button size="small" @click="showDetail = true">详情</n-button>
@@ -924,6 +969,35 @@ onBeforeUnmount(() => {
       <template #footer>
         <n-space justify="end">
           <n-button @click="showConflictDetail = false">关闭</n-button>
+        </n-space>
+      </template>
+    </n-modal>
+
+    <!-- 约束查看/更换弹窗 -->
+    <n-modal v-model:show="showConstraint" preset="card" title="任务约束" style="max-width:640px">
+      <div style="font-size:12px;color:var(--cy-muted);margin-bottom:12px">
+        约束随模板实时读取；任务进行中更换后在后续 AI 调用（冲突解决/回归审查）生效。
+      </div>
+      <n-select v-model:value="constraintTemplateId" :options="constraintTemplateOptions"
+        placeholder="选择约束模板（留空则使用下方内联文本）" clearable
+        style="margin-bottom:12px" @update:value="onConstraintTemplatePick" />
+      <template v-if="constraintTemplateId">
+        <n-alert type="info" :bordered="false" style="margin-bottom:12px">
+          <div style="font-size:12px;color:var(--cy-muted);margin-bottom:4px">
+            已引用模板：{{ currentConstraintTemplate?.name ?? constraintTemplateId }}
+          </div>
+          <span style="white-space:pre-wrap;font-size:13px">{{ currentConstraintTemplate ? concatTemplateContent(currentConstraintTemplate) : '（模板内容加载中…）' }}</span>
+        </n-alert>
+      </template>
+      <template v-else>
+        <div style="font-size:12px;color:var(--cy-muted);margin-bottom:6px">内联约束文本</div>
+        <n-input v-model:value="constraintText" type="textarea" :rows="6"
+          placeholder="如：不引入第三方依赖 / 保持兼容性 / 遵循某代码规范..." />
+      </template>
+      <template #footer>
+        <n-space justify="end">
+          <n-button @click="showConstraint = false">取消</n-button>
+          <n-button type="primary" :loading="savingConstraint" @click="saveConstraint">保存</n-button>
         </n-space>
       </template>
     </n-modal>
