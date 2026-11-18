@@ -181,6 +181,16 @@ export function concatTemplateContent(t: ConstraintTemplate): string {
   return (t.modules ?? []).map((m) => m.content).filter((c) => c.trim() !== '').join('\n\n')
 }
 
+// 前端约束预览：把文本里的 {{key}} 替换为 vars 中非空值；空值/未提供的占位符保留原样，
+// 便于在预览里一眼看出还有哪些占位符没填（运行时才有的项如 {{migration.source_commit}} 也保留）。
+export function renderConstraintPreview(text: string, vars: Record<string, string>): string {
+  let out = text
+  for (const [k, v] of Object.entries(vars)) {
+    if (v) out = out.split('{{' + k + '}}').join(v)
+  }
+  return out
+}
+
 // ---- AI 提示词模板 ----
 
 export interface Scene {

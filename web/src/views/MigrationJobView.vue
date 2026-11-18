@@ -9,7 +9,7 @@ import {
   getMigration, migrateCommit, migrateRange, resolveMigrationConflict,
   aiResolveMigrationConflict, cancelAiResolveConflict, autoMigrate, cancelAutoMigrate, regressionMigration, resetMigrationTarget, completeMigration,
   setMigrationCommitMark, ignoreMigrationCommit, ignoreMigrationRange, mergeMigrationCommits, setMigrationCommitTarget,
-  listAiActivity, listConstraintTemplates, updateJobConstraints, concatTemplateContent,
+  listAiActivity, listConstraintTemplates, updateJobConstraints, concatTemplateContent, renderConstraintPreview,
   type MigrationDetail, type CommitEntry, type CommitState, type CommitInfo, type ConflictRecord, type ConstraintTemplate,
 } from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -55,7 +55,23 @@ const constraintTemplateId = ref<string | null>(null)
 const constraintText = ref('')
 const constraintVars = ref<Record<string, string>>({})
 const savingConstraint = ref(false)
+const showPreview = ref(false)
+
 // 预览：把「迁移任务内置变量 + 自定义注入变量」替换进当前约束文本后展示。
+const previewText = computed(() => {
+  const base = currentConstraintTemplate.value
+    ? concatTemplateContent(currentConstraintTemplate.value)
+    : constraintText.value
+  const builtin: Record<string, string> = {}
+  const mig = job.value?.migration
+  if (mig) {
+    builtin['migration.source_branch'] = mig.source_branch
+    builtin['migration.target_base'] = mig.target_base
+    builtin['migration.target_branch'] = mig.target_branch
+  }
+  return renderConstraintPreview(base, { ...builtin, ...(constraintVars.value ?? {}) })
+})
+
 
 const constraintTemplateOptions = computed(() =>
   constraintTemplates.value
@@ -1006,10 +1022,21 @@ onBeforeUnmount(() => {
         <n-input v-model:value="constraintText" type="textarea" :rows="6"
           placeholder="如：不引入第三方依赖 / 保持兼容性 / 遵循某代码规范..." />
       </template>
+      <div v-if="showPreview" style="margin-top:12px;border-top:1px solid var(--cy-border);padding-top:12px">
+        <div style="font-size:12px;color:var(--cy-muted);margin-bottom:6px">约束预览（已注入任务变量与自定义变量）</div>
+        <div style="max-height:40vh;overflow:auto;white-space:pre-wrap;word-break:break-all;font-size:13px;background:var(--cy-panel);border:1px solid var(--cy-border);border-radius:4px;padding:10px 12px">{{ previewText }}</div>
+      </div>
       <template #footer>
-        <n-space justify="end">
-          <n-button @click="showConstraint = false">取消</n-button>
-          <n-button type="primary" :loading="savingConstraint" @click="saveConstraint">保存</n-button>
+        <n-space justify="space-between">
+          <n-button @click="showPreview = !showPreview">{{ showPreview ? '收起预览' : '预览' }}</n-button>
+          <n-space>
+            <n-button @click="showConstraint = false">取消</n-button>
+            <n-button type="primary" :loading="savingConstraint" @click="saveConstraint">保存</n-button>
+          </n-space>
+        </n-space>
+      </template>
+    </n-modal>
+
         </n-space>
       </template>
     </n-modal>

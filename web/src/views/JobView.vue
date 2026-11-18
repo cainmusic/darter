@@ -2,7 +2,7 @@
 import { onMounted, onBeforeUnmount, ref, computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NSpace, NSpin, NEmpty, NAlert, NTag, NInput, NModal, NRadioGroup, NRadioButton, NSelect, useMessage, useDialog } from 'naive-ui'
-import { getJob, parseJob, redecomposeJob, startJob, cancelJob, pauseJob, unpauseJob, getTask, getEvents, deferTask, annotateTask, downloadProblems, startArchive, archiveFreeze, redoAll, confirmArchive, resolveArchiveTask, listConstraintTemplates, updateJobConstraints, concatTemplateContent, type Job, type Task, type Evt, type Attempt, type ConstraintTemplate } from '../api'
+import { getJob, parseJob, redecomposeJob, startJob, cancelJob, pauseJob, unpauseJob, getTask, getEvents, deferTask, annotateTask, downloadProblems, startArchive, archiveFreeze, redoAll, confirmArchive, resolveArchiveTask, listConstraintTemplates, updateJobConstraints, concatTemplateContent, renderConstraintPreview, type Job, type Task, type Evt, type Attempt, type ConstraintTemplate } from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
 import TerminalPanel from '../components/TerminalPanel.vue'
 import DiffView from '../components/DiffView.vue'
@@ -247,7 +247,20 @@ const constraintTemplateId = ref<string | null>(null)
 const constraintText = ref('')
 const constraintVars = ref<Record<string, string>>({})
 const savingConstraint = ref(false)
+const showPreview = ref(false)
+
 // 预览：把「任务内置变量 + 自定义注入变量」替换进当前约束文本后展示。
+const previewText = computed(() => {
+  const base = currentConstraintTemplate.value
+    ? concatTemplateContent(currentConstraintTemplate.value)
+    : constraintText.value
+  const builtin: Record<string, string> = {}
+  if (job.value) {
+    builtin['fixer.base_branch'] = job.value.base_branch
+    builtin['fixer.fix_branch'] = job.value.fix_branch
+  }
+  return renderConstraintPreview(base, { ...builtin, ...(constraintVars.value ?? {}) })
+})
 
 const constraintTemplateOptions = computed(() =>
   constraintTemplates.value.map((t) => ({ label: t.name, value: t.id })),
@@ -814,10 +827,17 @@ onBeforeUnmount(() => es?.close())
         <n-input v-model:value="constraintText" type="textarea" :rows="6"
           placeholder="如：不引入第三方依赖 / 保持 Go 1.20 兼容 / 遵循某代码规范..." />
       </template>
+      <div v-if="showPreview" style="margin-top:12px;border-top:1px solid var(--cy-border);padding-top:12px">
+        <div style="font-size:12px;color:var(--cy-muted);margin-bottom:6px">约束预览（已注入任务变量与自定义变量）</div>
+        <div style="max-height:40vh;overflow:auto;white-space:pre-wrap;word-break:break-all;font-size:13px;background:var(--cy-panel);border:1px solid var(--cy-border);border-radius:4px;padding:10px 12px">{{ previewText }}</div>
+      </div>
       <template #footer>
-        <n-space justify="end">
-          <n-button @click="showConstraint = false">取消</n-button>
-          <n-button type="primary" :loading="savingConstraint" @click="saveConstraint">保存</n-button>
+        <n-space justify="space-between">
+          <n-button @click="showPreview = !showPreview">{{ showPreview ? '收起预览' : '预览' }}</n-button>
+          <n-space>
+            <n-button @click="showConstraint = false">取消</n-button>
+            <n-button type="primary" :loading="savingConstraint" @click="saveConstraint">保存</n-button>
+          </n-space>
         </n-space>
       </template>
     </n-modal>
