@@ -14,16 +14,19 @@ type Job struct {
 	Constraints  string       `json:"constraints,omitempty"`
 	// ConstraintTemplateID 引用的约束模板 ID（空 = 无模板引用，用内联 Constraints）。
 	// 约束文本在运行时按此 ID 从模板「每次读最新内容」，因此改模板/换模板都会在后续任务生效。
-	ConstraintTemplateID string  `json:"constraint_template_id,omitempty"`
-	Status               Status  `json:"status"`
-	TasksFrozen          bool    `json:"tasks_frozen"`
-	CurrentTask          string  `json:"current_task_id,omitempty"`
-	MaxRetries           int     `json:"max_retries"`
-	ClaudeCmd            string  `json:"claude_cmd"`
-	ClaudeModel          string  `json:"claude_model,omitempty"`
-	Regression           *Review `json:"regression,omitempty"`     // 宏观回归审查结论（任务全跑完后对整条分支的完整性检查）
-	ArchiveBranch        string  `json:"archive_branch,omitempty"` // 归档分支名（基于 base 分支，逐个迁移 approved 任务）
-	ArchiveReview        *Review `json:"archive_review,omitempty"` // 归档完成后的最终回归审查结论
+	ConstraintTemplateID string `json:"constraint_template_id,omitempty"`
+	// ConstraintVars 自定义注入变量的取值（key → value）。key 来自约束模板的 Variables；
+	// 运行时替换约束文本里的 {{key}} 为对应 value。
+	ConstraintVars map[string]string `json:"constraint_vars,omitempty"`
+	Status         Status            `json:"status"`
+	TasksFrozen    bool              `json:"tasks_frozen"`
+	CurrentTask    string            `json:"current_task_id,omitempty"`
+	MaxRetries     int               `json:"max_retries"`
+	ClaudeCmd      string            `json:"claude_cmd"`
+	ClaudeModel    string            `json:"claude_model,omitempty"`
+	Regression     *Review           `json:"regression,omitempty"`     // 宏观回归审查结论（任务全跑完后对整条分支的完整性检查）
+	ArchiveBranch  string            `json:"archive_branch,omitempty"` // 归档分支名（基于 base 分支，逐个迁移 approved 任务）
+	ArchiveReview  *Review           `json:"archive_review,omitempty"` // 归档完成后的最终回归审查结论
 	// RemainingFindings 遗留问题清单：宏观回归审查发现、但归档阶段不处理的问题（归档终审时固化，交人工跟进）。
 	RemainingFindings []Finding `json:"remaining_findings,omitempty"`
 	// DecomposeIgnored 拆解阶段被忽略的报告内容（未拆成任务）及原因，供前端展示，保证「丢弃有据可查」。

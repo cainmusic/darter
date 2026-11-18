@@ -16,6 +16,7 @@ export interface Job {
   report_source: { type: string; value: string }
   constraints?: string
   constraint_template_id?: string
+  constraint_vars?: Record<string, string>
   status: JobStatus
   tasks_frozen: boolean
   current_task_id?: string
@@ -93,6 +94,7 @@ export interface CreateJobInput {
   report_source: { type: string; value: string }
   constraints?: string
   constraint_template_id?: string
+  constraint_vars?: Record<string, string>
   max_retries?: number
 }
 
@@ -149,7 +151,8 @@ export const getSettings = () => api<Settings>('/api/settings')
 export const saveSettings = (s: Settings) => api<Settings>('/api/settings', { method: 'PUT', body: JSON.stringify(s) })
 
 export interface ConstraintModule { id: string; name: string; content: string }
-export interface ConstraintTemplate { id: string; name: string; scene?: string; modules: ConstraintModule[] }
+export interface ConstraintVariable { name: string; key: string; description: string }
+export interface ConstraintTemplate { id: string; name: string; scene?: string; modules: ConstraintModule[]; variables?: ConstraintVariable[] }
 
 export interface TemplateUser { id: string; name: string; status: string }
 export interface ConstraintTemplateDetail { template: ConstraintTemplate; used_by: TemplateUser[] }
@@ -166,10 +169,10 @@ export const listConstraintInjectables = () => api<InjectableCatalog>('/api/cons
 export const getConstraintTemplate = (id: string) => api<ConstraintTemplateDetail>(`/api/constraint-templates/${id}`)
 export const copyConstraintTemplate = (id: string) =>
   api<ConstraintTemplate>(`/api/constraint-templates/${id}/copy`, { method: 'POST' })
-export const createConstraintTemplate = (name: string, modules: ConstraintModule[], scene = 'common') =>
-  api<ConstraintTemplate>('/api/constraint-templates', { method: 'POST', body: JSON.stringify({ name, modules, scene }) })
-export const updateConstraintTemplate = (id: string, name: string, modules: ConstraintModule[], scene = 'common') =>
-  api<ConstraintTemplate>(`/api/constraint-templates/${id}`, { method: 'PUT', body: JSON.stringify({ name, modules, scene }) })
+export const createConstraintTemplate = (name: string, modules: ConstraintModule[], scene = 'common', variables: ConstraintVariable[] = []) =>
+  api<ConstraintTemplate>('/api/constraint-templates', { method: 'POST', body: JSON.stringify({ name, modules, scene, variables }) })
+export const updateConstraintTemplate = (id: string, name: string, modules: ConstraintModule[], scene = 'common', variables: ConstraintVariable[] = []) =>
+  api<ConstraintTemplate>(`/api/constraint-templates/${id}`, { method: 'PUT', body: JSON.stringify({ name, modules, scene, variables }) })
 export const deleteConstraintTemplate = (id: string) =>
   api<{ status: string }>(`/api/constraint-templates/${id}`, { method: 'DELETE' })
 
@@ -198,7 +201,7 @@ export interface PromptItem {
 export const listPrompts = () => api<PromptItem[]>('/api/prompts')
 export const listScenes = () => api<Scene[]>('/api/scenes')
 
-export const updateJobConstraints = (id: string, body: { constraint_template_id: string; constraints: string }) =>
+export const updateJobConstraints = (id: string, body: { constraint_template_id: string; constraints: string; constraint_vars?: Record<string, string> }) =>
   api<Job>(`/api/jobs/${id}/constraints`, { method: 'PUT', body: JSON.stringify(body) })
 
 // 下载「问题描述」md（group: 'passed'|'failed'|'skipped'，空串为全部问题），触发浏览器下载。
@@ -241,6 +244,7 @@ export interface MigJob {
   repo_path: string
   constraints?: string
   constraint_template_id?: string
+  constraint_vars?: Record<string, string>
   status: MigStatus
   migration: MigrationSpec
   regression?: Review
@@ -303,6 +307,7 @@ export interface CreateMigrationInput {
   target_branch: string
   constraints?: string
   constraint_template_id?: string
+  constraint_vars?: Record<string, string>
   max_retries?: number
 }
 

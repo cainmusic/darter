@@ -29,6 +29,7 @@ const form = ref<CreateMigrationInput>({
   target_branch: '',
   constraints: '',
   constraint_template_id: '',
+  constraint_vars: {},
   max_retries: 5,
 })
 
@@ -137,6 +138,7 @@ onMounted(refresh)
         <ConstraintPicker
           v-model:template-id="form.constraint_template_id"
           v-model:constraints="form.constraints"
+          v-model:constraint-vars="form.constraint_vars"
           scene="migration"
           template-label="约束模板（可选，AI 解决冲突时引用）"
           constraints-label="项目约束（可选，AI 解决冲突时带给 AI）" />

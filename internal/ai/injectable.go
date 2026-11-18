@@ -52,6 +52,22 @@ func RenderConstraints(constraints string, values map[string]string) string {
 	return render(constraints, values)
 }
 
+// MergeValues 把自定义注入变量合并进内置取值；自定义 key 覆盖同名内置 key。
+// 用于把 Job.ConstraintVars 合并进 MigrationConstraintValues / FixerConstraintValues 的结果后再替换。
+func MergeValues(base, custom map[string]string) map[string]string {
+	if len(custom) == 0 {
+		return base
+	}
+	out := make(map[string]string, len(base)+len(custom))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range custom {
+		out[k] = v
+	}
+	return out
+}
+
 // MigrationConstraintValues 构造代码迁移约束的占位符取值。
 // 三个分支永远填充；commit 非 nil 时填充 source_commit 系列；conflictFiles 非空时填充 conflict_files。
 // 已知但无值的占位符（如全量回归阶段没有单一源 commit）填充空串，替换后整段留空而非残留字面量。

@@ -14,6 +14,7 @@ import {
 } from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
 import AiActivityButton from '../components/AiActivityButton.vue'
+import ConstraintVarsEditor from '../components/ConstraintVarsEditor.vue'
 
 const route = useRoute()
 const message = useMessage()
@@ -52,7 +53,9 @@ const showConstraint = ref(false)
 const constraintTemplates = ref<ConstraintTemplate[]>([])
 const constraintTemplateId = ref<string | null>(null)
 const constraintText = ref('')
+const constraintVars = ref<Record<string, string>>({})
 const savingConstraint = ref(false)
+// 预览：把「迁移任务内置变量 + 自定义注入变量」替换进当前约束文本后展示。
 
 const constraintTemplateOptions = computed(() =>
   constraintTemplates.value
@@ -70,6 +73,7 @@ async function openConstraint() {
   if (!job.value) return
   constraintTemplateId.value = job.value.constraint_template_id || null
   constraintText.value = job.value.constraints || ''
+  constraintVars.value = job.value.constraint_vars ?? {}
   showConstraint.value = true
   if (!constraintTemplates.value.length) {
     try { constraintTemplates.value = await listConstraintTemplates() } catch { /* ignore */ }
@@ -80,6 +84,7 @@ function onConstraintTemplatePick(id: string | null) {
   constraintTemplateId.value = id
   // 用模板时清空内联文本，避免「引用模板 + 内联文本」并存造成歧义
   if (id) constraintText.value = ''
+  constraintVars.value = {}
 }
 
 async function saveConstraint() {
@@ -89,6 +94,7 @@ async function saveConstraint() {
     await updateJobConstraints(id, {
       constraint_template_id: constraintTemplateId.value ?? '',
       constraints: constraintText.value,
+      constraint_vars: constraintVars.value,
     })
     await refresh()
     message.success('已更新约束')
@@ -993,6 +999,7 @@ onBeforeUnmount(() => {
           </div>
           <span style="white-space:pre-wrap;font-size:13px">{{ currentConstraintTemplate ? concatTemplateContent(currentConstraintTemplate) : '（模板内容加载中…）' }}</span>
         </n-alert>
+        <ConstraintVarsEditor :variables="currentConstraintTemplate?.variables ?? []" v-model:values="constraintVars" />
       </template>
       <template v-else>
         <div style="font-size:12px;color:var(--cy-muted);margin-bottom:6px">内联约束文本</div>

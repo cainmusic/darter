@@ -203,6 +203,14 @@ type ConstraintModule struct {
 	Content string `json:"content"` // 详情文本
 }
 
+// ConstraintVariable 约束模板里自定义的注入变量：建任务时为每个变量填值，运行时替换约束文本里的 {{key}}。
+// 与内置占位符（{{migration.*}}/{{fixer.*}}）不同，这些变量的 key 与取值由用户自定义。
+type ConstraintVariable struct {
+	Name        string `json:"name"`        // 字段名（配置界面显示，如「参考分支」）
+	Key         string `json:"key"`         // 注入 key（约束文本里写 {{key}}，如 refs → {{refs}}）
+	Description string `json:"description"` // 说明文字（配置界面提示）
+}
+
 // ConstraintTemplate 项目约束模板：预存一段项目约束文本，新建修复任务时可一键套用。
 // 采用「两层」结构：第一层是模板本身，第二层是有序的模块列表（分段），
 // 使用时把各模块详情按顺序拼接成最终约束文本。
@@ -213,6 +221,8 @@ type ConstraintTemplate struct {
 	// 空值按 common 处理；用于约束模板页按场景区分、以及建任务时按场景过滤可选模板。
 	Scene   string             `json:"scene,omitempty"`
 	Modules []ConstraintModule `json:"modules"`
+	// Variables 自定义注入变量清单：建任务时按此渲染配置列表，取值为 Job.ConstraintVars。
+	Variables []ConstraintVariable `json:"variables,omitempty"`
 	// Content 遗留字段：旧数据是单段文本。读取旧数据时若 Modules 为空而 Content 非空，自动包装成单模块。
 	// 新数据只写 Modules，此字段不再落盘（omitempty）。
 	Content string `json:"content,omitempty"`

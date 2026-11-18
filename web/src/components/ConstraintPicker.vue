@@ -2,6 +2,7 @@
 import { onMounted, ref, computed } from 'vue'
 import { NSelect, NInput, NAlert, NButton, NModal, NForm, NFormItem, useMessage } from 'naive-ui'
 import { listConstraintTemplates, createConstraintTemplate, concatTemplateContent, type ConstraintTemplate } from '../api'
+import ConstraintVarsEditor from './ConstraintVarsEditor.vue'
 
 const props = defineProps<{
   templateLabel?: string
@@ -10,9 +11,10 @@ const props = defineProps<{
   scene?: string // 当前任务场景（fixer / migration / common）；有值时只显示本场景 + 通用模板
 }>()
 
-// 选中的约束模板 id（'' = 未选，用内联文本）；内联约束文本（未选模板时使用）。
+// 选中的约束模板 id（'' = 未选，用内联文本）；内联约束文本（未选模板时使用）；注入变量取值（key → value）。
 const templateId = defineModel<string>('templateId', { default: '' })
 const constraints = defineModel<string>('constraints', { default: '' })
+const constraintVars = defineModel<Record<string, string>>('constraintVars', { default: () => ({}) })
 
 const message = useMessage()
 const templates = ref<ConstraintTemplate[]>([])
@@ -27,8 +29,9 @@ const templateOptions = computed(() => templates.value
     return sc === 'common' || sc === props.scene
   })
   .map((t) => ({ label: t.name, value: t.id })))
+const selectedTemplate = computed(() => templates.value.find((t) => t.id === templateId.value) ?? null)
 const selectedTemplateContent = computed(() => {
-  const t = templates.value.find((t) => t.id === templateId.value)
+  const t = selectedTemplate.value
   return t ? concatTemplateContent(t) : ''
 })
 
@@ -40,6 +43,8 @@ function onTemplatePick(id: string | null) {
   templateId.value = id ?? ''
   // 用模板时清空内联文本，避免「引用模板 + 内联文本」并存造成歧义
   if (id) constraints.value = ''
+  // 切换模板时清空注入变量取值（不同模板的变量不同）
+  constraintVars.value = {}
 }
 
 function openSaveTemplate() {
@@ -76,9 +81,12 @@ onMounted(loadTemplates)
   </n-form-item>
   <n-form-item :label="props.constraintsLabel ?? '项目约束（可选）'">
     <div style="width:100%">
-      <n-alert v-if="templateId" type="info" :bordered="false" style="margin-bottom:6px">
-        <span style="white-space:pre-wrap">已引用模板，内容（只读）：{{ selectedTemplateContent }}</span>
-      </n-alert>
+      <template v-if="templateId">
+        <n-alert type="info" :bordered="false" style="margin-bottom:6px">
+          <span style="white-space:pre-wrap">已引用模板，内容（只读）：{{ selectedTemplateContent }}</span>
+        </n-alert>
+        <ConstraintVarsEditor :variables="selectedTemplate?.variables ?? []" v-model:values="constraintVars" />
+      </template>
       <n-input v-else v-model:value="constraints" type="textarea" :rows="3"
         :placeholder="props.constraintsPlaceholder ?? '如：不引入第三方依赖 / 保持兼容 / 遵循某代码规范 / 不修改公共 API...'" />
       <div v-if="!templateId" style="margin-top:6px;text-align:right">

@@ -63,14 +63,15 @@ func (a *App) loadMigration(w http.ResponseWriter, r *http.Request) (*job.Job, b
 // createMigration 创建迁移任务：校验目录/分支、切出目标分支、载入 commit 列表。
 func (a *App) createMigration(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name                 string `json:"name"`
-		RepoPath             string `json:"repo_path"`
-		SourceBranch         string `json:"source_branch"`
-		TargetBase           string `json:"target_base"`
-		TargetBranch         string `json:"target_branch"`
-		Constraints          string `json:"constraints"`
-		ConstraintTemplateID string `json:"constraint_template_id"`
-		MaxRetries           int    `json:"max_retries"`
+		Name                 string            `json:"name"`
+		RepoPath             string            `json:"repo_path"`
+		SourceBranch         string            `json:"source_branch"`
+		TargetBase           string            `json:"target_base"`
+		TargetBranch         string            `json:"target_branch"`
+		Constraints          string            `json:"constraints"`
+		ConstraintTemplateID string            `json:"constraint_template_id"`
+		ConstraintVars       map[string]string `json:"constraint_vars"`
+		MaxRetries           int               `json:"max_retries"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, 400, "请求体解析失败: "+err.Error())
@@ -120,6 +121,7 @@ func (a *App) createMigration(w http.ResponseWriter, r *http.Request) {
 		Migration:            &job.MigrationSpec{SourceBranch: req.SourceBranch, TargetBase: req.TargetBase, TargetBranch: req.TargetBranch, MaxRetries: maxRetries},
 		Constraints:          req.Constraints,
 		ConstraintTemplateID: req.ConstraintTemplateID,
+		ConstraintVars:       req.ConstraintVars,
 		ClaudeCmd:            a.settings.ClaudeCmd,
 		ClaudeModel:          a.settings.ClaudeModel,
 		CreatedAt:            time.Now(),
@@ -984,7 +986,7 @@ func (a *App) resolveConflictWithAI(ctx context.Context, g *git.Service, j *job.
 	if ci, err := g.ResolveCommit("CHERRY_PICK_HEAD"); err == nil {
 		srcCommit = &job.CommitEntry{Hash: ci.Hash, Subject: ci.Subject, Message: ci.Message}
 	}
-	constraints = ai.RenderConstraints(constraints, ai.MigrationConstraintValues(j.Migration, srcCommit, files))
+	constraints = ai.RenderConstraints(constraints, ai.MergeValues(ai.MigrationConstraintValues(j.Migration, srcCommit, files), j.ConstraintVars))
 
 	recordAttempt("AI 开始尝试解决冲突")
 
@@ -1458,7 +1460,7 @@ func (a *App) runMigrationRegression(j *job.Job) {
 	}
 	constraints := a.store.ResolveConstraint(j.ConstraintTemplateID, j.Constraints)
 	// 全量回归阶段没有单一源 commit，故只替换三个分支占位符（commit/冲突文件占位符替换为空串）。
-	constraints = ai.RenderConstraints(constraints, ai.MigrationConstraintValues(j.Migration, nil, nil))
+	constraints = ai.RenderConstraints(constraints, ai.MergeValues(ai.MigrationConstraintValues(j.Migration, nil, nil), j.ConstraintVars))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

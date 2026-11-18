@@ -254,8 +254,9 @@ func (a *App) createJob(w http.ResponseWriter, r *http.Request) {
 		ReportSource job.ReportSource `json:"report_source"`
 		Constraints  string           `json:"constraints"`
 		// ConstraintTemplateID 引用的约束模板 ID（可选）；与 Constraints 互斥，模板优先。
-		ConstraintTemplateID string `json:"constraint_template_id"`
-		MaxRetries           int    `json:"max_retries"`
+		ConstraintTemplateID string            `json:"constraint_template_id"`
+		ConstraintVars       map[string]string `json:"constraint_vars"`
+		MaxRetries           int               `json:"max_retries"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, 400, "请求体解析失败: "+err.Error())
@@ -297,6 +298,7 @@ func (a *App) createJob(w http.ResponseWriter, r *http.Request) {
 		ReportSource:         req.ReportSource,
 		Constraints:          req.Constraints,
 		ConstraintTemplateID: req.ConstraintTemplateID,
+		ConstraintVars:       req.ConstraintVars,
 		Status:               job.StatusDraft,
 		MaxRetries:           retries,
 		ClaudeCmd:            a.settings.ClaudeCmd,
@@ -348,8 +350,9 @@ func (a *App) updateJobConstraints(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		ConstraintTemplateID string `json:"constraint_template_id"`
-		Constraints          string `json:"constraints"`
+		ConstraintTemplateID string            `json:"constraint_template_id"`
+		Constraints          string            `json:"constraints"`
+		ConstraintVars       map[string]string `json:"constraint_vars"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, 400, "请求体解析失败: "+err.Error())
@@ -378,6 +381,7 @@ func (a *App) updateJobConstraints(w http.ResponseWriter, r *http.Request) {
 	}
 	j.ConstraintTemplateID = req.ConstraintTemplateID
 	j.Constraints = req.Constraints
+	j.ConstraintVars = req.ConstraintVars
 	j.UpdatedAt = time.Now()
 	if err := a.store.SaveJob(j); err != nil {
 		writeErr(w, 500, err.Error())
@@ -504,7 +508,7 @@ func (a *App) launchParse(j *job.Job, releaseRepo func()) {
 
 		// 拆解/质检都在项目目录里只读进行，注入约束作为项目背景（判断问题归属的服务与文件）。
 		constraints := a.store.ResolveConstraint(j.ConstraintTemplateID, j.Constraints)
-		constraints = ai.RenderConstraints(constraints, ai.FixerConstraintValues(j))
+		constraints = ai.RenderConstraints(constraints, ai.MergeValues(ai.FixerConstraintValues(j), j.ConstraintVars))
 		// 打回重做时的人工说明，喂给拆解与复查 AI 改进，避免重复上次的问题。
 		feedback := j.RedecomposeReason
 
@@ -1053,7 +1057,7 @@ func (a *App) aiReviewTask(w http.ResponseWriter, r *http.Request) {
 	}
 	cmd, model := j.ClaudeCmd, j.ClaudeModel
 	constraints, repoPath, prompt := a.store.ResolveConstraint(j.ConstraintTemplateID, j.Constraints), j.RepoPath, req.Prompt
-	constraints = ai.RenderConstraints(constraints, ai.FixerConstraintValues(j))
+	constraints = ai.RenderConstraints(constraints, ai.MergeValues(ai.FixerConstraintValues(j), j.ConstraintVars))
 	taskCopy := *t
 
 	a.wg.Add(1)
@@ -1517,10 +1521,11 @@ func (a *App) copyConstraintTemplate(w http.ResponseWriter, r *http.Request) {
 	mods := make([]store.ConstraintModule, len(src.Modules))
 	copy(mods, src.Modules)
 	t := store.ConstraintTemplate{
-		ID:      fmt.Sprintf("tpl_%s_%s", time.Now().Format("20060102-150405"), randSuffix()),
-		Name:    src.Name + " (副本)",
-		Scene:   src.Scene,
-		Modules: mods,
+		ID:        fmt.Sprintf("tpl_%s_%s", time.Now().Format("20060102-150405"), randSuffix()),
+		Name:      src.Name + " (副本)",
+		Scene:     src.Scene,
+		Modules:   mods,
+		Variables: src.Variables,
 	}
 	ts = append(ts, t)
 	if err := a.store.SaveConstraintTemplates(ts); err != nil {
@@ -1533,10 +1538,11 @@ func (a *App) copyConstraintTemplate(w http.ResponseWriter, r *http.Request) {
 // constraintTemplateReq 是创建/更新模板的请求体。新结构传 modules（分段），
 // 兼容旧前端/旧调用传整段 content（自动包装成单模块）。
 type constraintTemplateReq struct {
-	Name    string                   `json:"name"`
-	Scene   string                   `json:"scene"`
-	Content string                   `json:"content"`
-	Modules []store.ConstraintModule `json:"modules"`
+	Name      string                     `json:"name"`
+	Scene     string                     `json:"scene"`
+	Content   string                     `json:"content"`
+	Modules   []store.ConstraintModule   `json:"modules"`
+	Variables []store.ConstraintVariable `json:"variables"`
 }
 
 // normalizeScene 归一化约束模板场景：仅允许 common / fixer / migration，其余（含空）回落 common。
@@ -1547,6 +1553,23 @@ func normalizeScene(s string) string {
 	default:
 		return ai.SceneCommon
 	}
+}
+
+// normalizeVariables 归一化自定义注入变量：过滤空 key/空字段名，按 key 去重。
+func normalizeVariables(vars []store.ConstraintVariable) []store.ConstraintVariable {
+	out := make([]store.ConstraintVariable, 0, len(vars))
+	seen := map[string]bool{}
+	for _, v := range vars {
+		v.Name = strings.TrimSpace(v.Name)
+		v.Key = strings.TrimSpace(v.Key)
+		v.Description = strings.TrimSpace(v.Description)
+		if v.Key == "" || v.Name == "" || seen[v.Key] {
+			continue
+		}
+		seen[v.Key] = true
+		out = append(out, v)
+	}
+	return out
 }
 
 // normalizeModules 把请求体规整成有序模块列表：
@@ -1599,10 +1622,11 @@ func (a *App) createConstraintTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t := store.ConstraintTemplate{
-		ID:      fmt.Sprintf("tpl_%s_%s", time.Now().Format("20060102-150405"), randSuffix()),
-		Name:    req.Name,
-		Scene:   normalizeScene(req.Scene),
-		Modules: mods,
+		ID:        fmt.Sprintf("tpl_%s_%s", time.Now().Format("20060102-150405"), randSuffix()),
+		Name:      req.Name,
+		Scene:     normalizeScene(req.Scene),
+		Modules:   mods,
+		Variables: normalizeVariables(req.Variables),
 	}
 	ts = append(ts, t)
 	if err := a.store.SaveConstraintTemplates(ts); err != nil {
@@ -1639,6 +1663,7 @@ func (a *App) updateConstraintTemplate(w http.ResponseWriter, r *http.Request) {
 			ts[i].Name = req.Name
 			ts[i].Scene = normalizeScene(req.Scene)
 			ts[i].Modules = mods
+			ts[i].Variables = normalizeVariables(req.Variables)
 			ts[i].Content = ""
 			if err := a.store.SaveConstraintTemplates(ts); err != nil {
 				writeErr(w, 500, err.Error())

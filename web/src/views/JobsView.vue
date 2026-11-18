@@ -26,6 +26,7 @@ const form = ref({
   report_value: '',
   constraints: '',
   constraint_template_id: '',
+  constraint_vars: {} as Record<string, string>,
   max_retries: 3,
 })
 
@@ -72,6 +73,7 @@ async function submit() {
       report_source: { type: form.value.report_type, value: form.value.report_value },
       constraints: form.value.constraints,
       constraint_template_id: form.value.constraint_template_id || undefined,
+      constraint_vars: form.value.constraint_vars,
       max_retries: form.value.max_retries,
     }
     const j = await createJob(body)
@@ -144,6 +146,7 @@ onMounted(refresh)
         <ConstraintPicker
           v-model:template-id="form.constraint_template_id"
           v-model:constraints="form.constraints"
+          v-model:constraint-vars="form.constraint_vars"
           scene="fixer"
           template-label="约束模板（可选，选中后引用该模板，约束随模板更新）"
           constraints-label="项目约束（可选，修复时带给 AI）" />

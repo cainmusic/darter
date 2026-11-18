@@ -8,7 +8,7 @@ import {
   listConstraintTemplates, getConstraintTemplate, copyConstraintTemplate,
   createConstraintTemplate, updateConstraintTemplate, deleteConstraintTemplate,
   listConstraintInjectables, SCENE_LABELS,
-  type ConstraintTemplate, type ConstraintModule, type TemplateUser,
+  type ConstraintTemplate, type ConstraintModule, type ConstraintVariable, type TemplateUser,
   type InjectableCatalog, type InjectableField,
 } from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -34,6 +34,7 @@ const collapsed = ref<Record<string, boolean>>({})
 const editorKey = ref(0)
 
 const editScene = ref('common')
+const editVariables = ref<ConstraintVariable[]>([])
 const injectableCatalog = ref<InjectableCatalog | null>(null)
 const injectableError = ref('')
 const showInjectables = ref(false)
@@ -87,6 +88,14 @@ function removeModule(i: number) {
   editModules.value.splice(i, 1)
 }
 
+function addVariable() {
+  editVariables.value.push({ name: '', key: '', description: '' })
+}
+
+function removeVariable(i: number) {
+  editVariables.value.splice(i, 1)
+}
+
 function moveModule(i: number, dir: -1 | 1) {
   const j = i + dir
   if (j < 0 || j >= editModules.value.length) return
@@ -123,6 +132,7 @@ async function select(id: string | null) {
   editName.value = t?.name ?? ''
   editScene.value = t?.scene ?? 'common'
   editModules.value = (t?.modules ?? []).map((m) => ({ ...m }))
+  editVariables.value = (t?.variables ?? []).map((v) => ({ ...v }))
   collapsed.value = {}
   editorKey.value++
   usedBy.value = []
@@ -140,6 +150,7 @@ function newTemplate() {
   editName.value = ''
   editScene.value = 'common'
   editModules.value = [{ id: genModuleId(), name: '', content: '' }]
+  editVariables.value = []
   collapsed.value = {}
   editorKey.value++
 }
@@ -179,10 +190,10 @@ async function doSave() {
   try {
     let t: ConstraintTemplate
     if (isNew.value) {
-      t = await createConstraintTemplate(name, mods, editScene.value)
+      t = await createConstraintTemplate(name, mods, editScene.value, editVariables.value)
       templates.value.push(t)
     } else if (selectedId.value) {
-      t = await updateConstraintTemplate(selectedId.value, name, mods, editScene.value)
+      t = await updateConstraintTemplate(selectedId.value, name, mods, editScene.value, editVariables.value)
       const i = templates.value.findIndex((x) => x.id === t.id)
       if (i >= 0) templates.value[i] = t
     } else {
@@ -192,6 +203,7 @@ async function doSave() {
     isNew.value = false
     editName.value = t.name
     editModules.value = (t.modules ?? []).map((m) => ({ ...m }))
+    editVariables.value = (t.variables ?? []).map((v) => ({ ...v }))
     collapsed.value = {}
     message.success('已保存')
   } catch (e: any) { message.error(e.message) } finally { saving.value = false }
@@ -303,6 +315,25 @@ onMounted(() => load())
                 </div>
               </div>
               <n-button size="small" dashed block @click="addModule">+ 添加一段</n-button>
+
+              <div style="margin-top:20px">
+                <div style="font-size:12px;color:var(--cy-muted);margin-bottom:6px">
+                  注入变量（可选，建任务时按此渲染配置列表；约束文本里用双花括号包裹 key 引用）
+                </div>
+                <div v-for="(v, i) in editVariables" :key="i"
+                  style="border:1px solid var(--cy-border);border-radius:4px;padding:10px;margin-bottom:10px;background:var(--cy-hover-bg)">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                    <span style="font-size:12px;color:var(--cy-muted)">变量 {{ i + 1 }}</span>
+                    <n-button size="tiny" text type="error" @click="removeVariable(i)" title="删除此变量">✕</n-button>
+                  </div>
+                  <div style="display:flex;gap:8px;margin-bottom:8px">
+                    <n-input v-model:value="v.name" placeholder="字段名（如：参考分支）" size="small" style="flex:1" />
+                    <n-input v-model:value="v.key" placeholder="注入 key（如：refs）" size="small" style="flex:1" />
+                  </div>
+                  <n-input v-model:value="v.description" placeholder="说明文字（配置时提示，可选）" size="small" />
+                </div>
+                <n-button size="small" dashed block @click="addVariable">+ 添加变量</n-button>
+              </div>
             </div>
 
             <!-- 底部：使用中的任务 + 保存（固定） -->

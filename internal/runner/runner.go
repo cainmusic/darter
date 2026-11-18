@@ -411,8 +411,8 @@ func (r *Runner) currentConstraints(jobID string, fallback *job.Job) string {
 		cur = fallback
 	}
 	constraints := r.Store.ResolveConstraint(cur.ConstraintTemplateID, cur.Constraints)
-	// 用审查修复上下文替换约束里的 {{fixer.*}} 占位符（基线分支 / 修复分支）。
-	return ai.RenderConstraints(constraints, ai.FixerConstraintValues(cur))
+	// 用审查修复上下文替换约束里的 {{fixer.*}} 占位符（基线分支 / 修复分支）+ 自定义注入变量。
+	return ai.RenderConstraints(constraints, ai.MergeValues(ai.FixerConstraintValues(cur), cur.ConstraintVars))
 }
 
 // cancel 处理用户取消：清理中断残留并把进行中任务复位为可恢复状态。
