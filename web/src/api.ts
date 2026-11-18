@@ -323,6 +323,18 @@ export interface CreateMigrationInput {
 
 export const listMigrations = () => api<MigJob[]>('/api/migrations')
 export const getMigration = (id: string) => api<MigrationDetail>(`/api/migrations/${id}`)
+
+export interface RepoState {
+  branch: string
+  cherry_pick: boolean
+  merge: boolean
+  rebase: boolean
+  conflicts: string[]
+  dirty: boolean
+}
+export interface MigrationRepoState { target_branch: string; state: RepoState }
+export const getMigrationRepoState = (id: string) => api<MigrationRepoState>(`/api/migrations/${id}/repo-state`)
+export const cleanMigrationRepo = (id: string) => api<MigrationRepoState>(`/api/migrations/${id}/repo-clean`, { method: 'POST' })
 export const createMigration = (body: CreateMigrationInput) =>
   api<MigJob>('/api/migrations', { method: 'POST', body: JSON.stringify(body) })
 export const migrateCommit = (id: string, hash: string) =>

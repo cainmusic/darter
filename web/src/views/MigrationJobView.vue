@@ -10,7 +10,8 @@ import {
   aiResolveMigrationConflict, cancelAiResolveConflict, autoMigrate, cancelAutoMigrate, regressionMigration, resetMigrationTarget, completeMigration,
   setMigrationCommitMark, ignoreMigrationCommit, ignoreMigrationRange, mergeMigrationCommits, setMigrationCommitTarget,
   listAiActivity, listConstraintTemplates, updateJobConstraints, concatTemplateContent, renderConstraintPreview,
-  type MigrationDetail, type CommitEntry, type CommitState, type CommitInfo, type ConflictRecord, type ConstraintTemplate,
+  getMigrationRepoState, cleanMigrationRepo,
+  type MigrationDetail, type CommitEntry, type CommitState, type CommitInfo, type ConflictRecord, type ConstraintTemplate, type MigrationRepoState,
 } from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
 import AiActivityButton from '../components/AiActivityButton.vue'
@@ -72,6 +73,47 @@ const previewText = computed(() => {
   return renderConstraintPreview(base, { ...builtin, ...(constraintVars.value ?? {}) })
 })
 
+// 仓库状态：展示当前项目状态（当前分支/进行中操作/冲突文件/工作区），支持手动清理残留。
+const showRepoState = ref(false)
+const repoState = ref<MigrationRepoState | null>(null)
+const loadingRepoState = ref(false)
+const cleaningRepo = ref(false)
+
+const repoHasPending = computed(() => {
+  const s = repoState.value?.state
+  return !!(s && (s.cherry_pick || s.merge || s.rebase))
+})
+
+async function loadRepoState() {
+  loadingRepoState.value = true
+  try { repoState.value = await getMigrationRepoState(id) } catch (e: any) { message.error(e.message) } finally { loadingRepoState.value = false }
+}
+
+async function openRepoState() {
+  showRepoState.value = true
+  await loadRepoState()
+}
+
+async function confirmCleanRepo() {
+  if (!repoHasPending.value) { message.info('当前没有需要清理的残留操作'); return }
+  const d = dialog.warning({
+    title: '清理仓库残留',
+    content: '将中止进行中的 cherry-pick / merge / rebase（若有）并清理未跟踪文件，把仓库恢复到干净、可重跑的状态。确认清理吗？',
+    positiveText: '清理',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      d.loading = true
+      cleaningRepo.value = true
+      try {
+        repoState.value = await cleanMigrationRepo(id)
+        message.success('已清理')
+      } catch (e: any) { message.error(e.message) } finally {
+        cleaningRepo.value = false
+        d.loading = false
+      }
+    },
+  })
+}
 
 const constraintTemplateOptions = computed(() =>
   constraintTemplates.value
@@ -729,6 +771,7 @@ onBeforeUnmount(() => {
           <n-button size="small" @click="refresh">刷新</n-button>
           <n-button size="small" @click="openConstraint">约束</n-button>
           <n-button size="small" @click="showAiHistory = true">AI 处理历史</n-button>
+          <n-button size="small" @click="openRepoState">仓库状态</n-button>
           <AiActivityButton :job-id="id" />
           <n-button size="small" @click="showDetail = true">详情</n-button>
           <n-button size="small" type="error" :disabled="isFinished || busy" @click="confirmComplete">完成</n-button>
@@ -1037,6 +1080,38 @@ onBeforeUnmount(() => {
       </template>
     </n-modal>
 
+    <!-- 仓库状态弹窗 -->
+    <n-modal v-model:show="showRepoState" preset="card" title="仓库状态" style="max-width:640px">
+      <div v-if="loadingRepoState" style="text-align:center;padding:20px 0;color:var(--cy-muted)">加载中…</div>
+      <template v-else-if="repoState">
+        <div style="font-size:13px;line-height:2">
+          <div>当前分支：<span class="glow-cyan">{{ repoState.state.branch || '—' }}</span></div>
+          <div>目标分支：<span :style="repoState.state.branch === repoState.target_branch ? 'color:var(--cy-green,#18a058)' : 'color:var(--cy-amber)'">{{ repoState.target_branch }}</span>
+            <span v-if="repoState.state.branch !== repoState.target_branch" style="color:var(--cy-amber);font-size:12px">　（当前不在目标分支）</span>
+          </div>
+          <div>进行中操作：
+            <span v-if="repoState.state.cherry_pick" class="glow-amber">cherry-pick　</span>
+            <span v-if="repoState.state.merge" class="glow-amber">merge　</span>
+            <span v-if="repoState.state.rebase" class="glow-amber">rebase　</span>
+            <span v-if="!repoState.state.cherry_pick && !repoState.state.merge && !repoState.state.rebase" style="color:var(--cy-muted)">无</span>
+          </div>
+          <div v-if="repoState.state.conflicts?.length" style="margin-top:6px">
+            <div style="color:var(--cy-muted);font-size:12px">冲突文件：</div>
+            <div v-for="f in repoState.state.conflicts" :key="f" class="glow-amber" style="font-size:12px">{{ f }}</div>
+          </div>
+          <div>工作区：<span :style="repoState.state.dirty ? 'color:var(--cy-amber)' : 'color:var(--cy-green,#18a058)'">{{ repoState.state.dirty ? '有未提交改动' : '干净' }}</span></div>
+        </div>
+        <n-alert v-if="repoHasPending" type="warning" :bordered="false" style="margin-top:12px">
+          检测到残留的进行中操作，可能导致迁移无法启动，可点击下方「清理残留」恢复。
+        </n-alert>
+      </template>
+      <template #footer>
+        <n-space justify="space-between">
+          <n-button type="warning" :disabled="!repoHasPending" :loading="cleaningRepo" @click="confirmCleanRepo">清理残留</n-button>
+          <n-space>
+            <n-button @click="loadRepoState" :loading="loadingRepoState">刷新</n-button>
+            <n-button @click="showRepoState = false">关闭</n-button>
+          </n-space>
         </n-space>
       </template>
     </n-modal>

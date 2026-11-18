@@ -218,6 +218,8 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /api/migrations", a.createMigration)
 	mux.HandleFunc("GET /api/migrations", a.listMigrations)
 	mux.HandleFunc("GET /api/migrations/{id}", a.getMigration)
+	mux.HandleFunc("GET /api/migrations/{id}/repo-state", a.repoState)
+	mux.HandleFunc("POST /api/migrations/{id}/repo-clean", a.cleanRepo)
 	mux.HandleFunc("POST /api/migrations/{id}/commits/{hash}/migrate", a.migrateCommit)
 	mux.HandleFunc("POST /api/migrations/{id}/commits/{hash}/mark", a.setCommitMark)
 	mux.HandleFunc("POST /api/migrations/{id}/commits/{hash}/target", a.setTargetCommit)

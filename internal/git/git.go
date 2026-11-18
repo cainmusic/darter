@@ -334,6 +334,60 @@ func (s *Service) ConflictFiles() ([]string, error) {
 	return res, nil
 }
 
+// RepoState 仓库当前状态：供任务页展示「当前项目状态」，并在残留进行中操作时手动清理。
+type RepoState struct {
+	Branch     string   `json:"branch"`      // 当前分支
+	CherryPick bool     `json:"cherry_pick"` // cherry-pick 进行中
+	Merge      bool     `json:"merge"`       // merge 进行中
+	Rebase     bool     `json:"rebase"`      // rebase 进行中
+	Conflicts  []string `json:"conflicts"`   // 未合并冲突文件
+	Dirty      bool     `json:"dirty"`       // 工作区脏（含已跟踪改动，不含 .claude）
+}
+
+// refExists 判断某 git 引用是否存在（CHERRY_PICK_HEAD / MERGE_HEAD / REBASE_HEAD 等）。
+func (s *Service) refExists(ref string) bool {
+	_, err := s.run("rev-parse", "--verify", "--quiet", ref)
+	return err == nil
+}
+
+// RepoState 返回仓库当前状态。
+func (s *Service) RepoState() RepoState {
+	st := RepoState{}
+	if b, err := s.CurrentBranch(); err == nil {
+		st.Branch = b
+	}
+	st.CherryPick = s.refExists("CHERRY_PICK_HEAD")
+	st.Merge = s.refExists("MERGE_HEAD")
+	st.Rebase = s.refExists("REBASE_HEAD")
+	if st.CherryPick || st.Merge || st.Rebase {
+		st.Conflicts, _ = s.ConflictFiles()
+	}
+	status, _ := s.Status()
+	st.Dirty = filterIgnorableUntracked(status) != ""
+	return st
+}
+
+// AbortPending 中止任何进行中的 cherry-pick / merge / rebase，并清理未跟踪文件，
+// 把仓库从卡住的进行中状态恢复到干净、可重跑的状态。
+func (s *Service) AbortPending() error {
+	if s.refExists("CHERRY_PICK_HEAD") {
+		if _, err := s.run("cherry-pick", "--abort"); err != nil {
+			return fmt.Errorf("中止 cherry-pick 失败: %w", err)
+		}
+	}
+	if s.refExists("MERGE_HEAD") {
+		if _, err := s.run("merge", "--abort"); err != nil {
+			return fmt.Errorf("中止 merge 失败: %w", err)
+		}
+	}
+	if s.refExists("REBASE_HEAD") {
+		if _, err := s.run("rebase", "--abort"); err != nil {
+			return fmt.Errorf("中止 rebase 失败: %w", err)
+		}
+	}
+	return s.CleanUntracked()
+}
+
 // RestoreConflicts 把冲突文件恢复到冲突态（重新生成 <<<<<<< / ======= / >>>>>>> 标记）。
 // 用于冲突解决审查驳回后，让 AI 基于原始冲突重新解决。依赖 index 里仍保留的冲突三方信息（stage 1/2/3）。
 func (s *Service) RestoreConflicts(files []string) error {

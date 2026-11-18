@@ -187,6 +187,52 @@ func (a *App) getMigration(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, a.migrationDetail(j))
 }
 
+// repoState 返回迁移任务仓库的当前状态（含目标分支，供前端对比当前/目标是否一致）。
+func (a *App) repoState(w http.ResponseWriter, r *http.Request) {
+	j, ok := a.loadMigration(w, r)
+	if !ok {
+		return
+	}
+	if j.Migration == nil {
+		writeErr(w, 500, "迁移配置缺失")
+		return
+	}
+	g := git.New(j.RepoPath)
+	writeJSON(w, 200, map[string]interface{}{
+		"target_branch": j.Migration.TargetBranch,
+		"state":         g.RepoState(),
+	})
+}
+
+// cleanRepo 清理仓库残留的进行中操作（中止 cherry-pick/merge/rebase + 清理未跟踪），返回清理后状态。
+// 持仓库锁，避免与其它 job 争用同一仓库。
+func (a *App) cleanRepo(w http.ResponseWriter, r *http.Request) {
+	j, ok := a.loadMigration(w, r)
+	if !ok {
+		return
+	}
+	if j.Migration == nil {
+		writeErr(w, 500, "迁移配置缺失")
+		return
+	}
+	release, err := a.tryAcquireRepo(j.RepoPath, j.ID)
+	if err != nil {
+		writeErr(w, 409, err.Error())
+		return
+	}
+	defer release()
+
+	g := git.New(j.RepoPath)
+	if err := g.AbortPending(); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]interface{}{
+		"target_branch": j.Migration.TargetBranch,
+		"state":         g.RepoState(),
+	})
+}
+
 // reloadMigCommits 载入源分支 commit 列表：过滤无内容 commit，标记已迁移，落盘。
 // 已迁移判断：仅用迁移时记录的 target_commit 做祖先判断（精确、不依赖 message，reset/amend 都能正确感知）。
 // 无迁移记录的 commit（工具外手动迁移/源新增）默认待迁移，由用户用「改目标」手动标记。保留已有的 skipped / mark。
