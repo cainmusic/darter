@@ -7,6 +7,7 @@ const props = defineProps<{
   templateLabel?: string
   constraintsLabel?: string
   constraintsPlaceholder?: string
+  scene?: string // 当前任务场景（fixer / migration / common）；有值时只显示本场景 + 通用模板
 }>()
 
 // 选中的约束模板 id（'' = 未选，用内联文本）；内联约束文本（未选模板时使用）。
@@ -19,7 +20,13 @@ const showSaveTemplate = ref(false)
 const templateName = ref('')
 const savingTemplate = ref(false)
 
-const templateOptions = computed(() => templates.value.map((t) => ({ label: t.name, value: t.id })))
+const templateOptions = computed(() => templates.value
+  .filter((t) => {
+    if (!props.scene) return true
+    const sc = t.scene ?? 'common'
+    return sc === 'common' || sc === props.scene
+  })
+  .map((t) => ({ label: t.name, value: t.id })))
 const selectedTemplateContent = computed(() => {
   const t = templates.value.find((t) => t.id === templateId.value)
   return t ? concatTemplateContent(t) : ''
@@ -46,7 +53,7 @@ async function confirmSaveTemplate() {
   if (!name) { message.warning('请输入模板名称'); return }
   savingTemplate.value = true
   try {
-    const t = await createConstraintTemplate(name, [{ id: 'm0', name: '内容', content: constraints.value }])
+    const t = await createConstraintTemplate(name, [{ id: 'm0', name: '内容', content: constraints.value }], props.scene ?? 'common')
     templates.value.push(t)
     templateId.value = t.id
     constraints.value = ''

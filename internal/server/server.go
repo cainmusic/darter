@@ -213,6 +213,7 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /api/constraint-templates/{id}/copy", a.copyConstraintTemplate)
 	mux.HandleFunc("PUT /api/constraint-templates/{id}", a.updateConstraintTemplate)
 	mux.HandleFunc("DELETE /api/constraint-templates/{id}", a.deleteConstraintTemplate)
+	mux.HandleFunc("GET /api/constraint-injectables", a.listConstraintInjectables)
 	// 代码迁移模块
 	mux.HandleFunc("POST /api/migrations", a.createMigration)
 	mux.HandleFunc("GET /api/migrations", a.listMigrations)
@@ -503,6 +504,7 @@ func (a *App) launchParse(j *job.Job, releaseRepo func()) {
 
 		// 拆解/质检都在项目目录里只读进行，注入约束作为项目背景（判断问题归属的服务与文件）。
 		constraints := a.store.ResolveConstraint(j.ConstraintTemplateID, j.Constraints)
+		constraints = ai.RenderConstraints(constraints, ai.FixerConstraintValues(j))
 		// 打回重做时的人工说明，喂给拆解与复查 AI 改进，避免重复上次的问题。
 		feedback := j.RedecomposeReason
 
@@ -1051,6 +1053,7 @@ func (a *App) aiReviewTask(w http.ResponseWriter, r *http.Request) {
 	}
 	cmd, model := j.ClaudeCmd, j.ClaudeModel
 	constraints, repoPath, prompt := a.store.ResolveConstraint(j.ConstraintTemplateID, j.Constraints), j.RepoPath, req.Prompt
+	constraints = ai.RenderConstraints(constraints, ai.FixerConstraintValues(j))
 	taskCopy := *t
 
 	a.wg.Add(1)
@@ -1448,6 +1451,14 @@ func (a *App) listConstraintTemplates(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, ts)
 }
 
+// listConstraintInjectables 返回约束模板的场景列表 + 可注入占位符清单（供约束模板页「可注入字段」表展示）。
+func (a *App) listConstraintInjectables(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, 200, map[string]interface{}{
+		"scenes": ai.ConstraintScenes,
+		"fields": ai.InjectableFields(),
+	})
+}
+
 // getConstraintTemplate 返回模板详情 + 正在使用它的未完结 job 列表（供「修改前提示」与「反向找 job」）。
 func (a *App) getConstraintTemplate(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
@@ -1508,6 +1519,7 @@ func (a *App) copyConstraintTemplate(w http.ResponseWriter, r *http.Request) {
 	t := store.ConstraintTemplate{
 		ID:      fmt.Sprintf("tpl_%s_%s", time.Now().Format("20060102-150405"), randSuffix()),
 		Name:    src.Name + " (副本)",
+		Scene:   src.Scene,
 		Modules: mods,
 	}
 	ts = append(ts, t)
@@ -1522,8 +1534,19 @@ func (a *App) copyConstraintTemplate(w http.ResponseWriter, r *http.Request) {
 // 兼容旧前端/旧调用传整段 content（自动包装成单模块）。
 type constraintTemplateReq struct {
 	Name    string                   `json:"name"`
+	Scene   string                   `json:"scene"`
 	Content string                   `json:"content"`
 	Modules []store.ConstraintModule `json:"modules"`
+}
+
+// normalizeScene 归一化约束模板场景：仅允许 common / fixer / migration，其余（含空）回落 common。
+func normalizeScene(s string) string {
+	switch strings.TrimSpace(s) {
+	case ai.SceneFixer, ai.SceneMigration, ai.SceneCommon:
+		return strings.TrimSpace(s)
+	default:
+		return ai.SceneCommon
+	}
 }
 
 // normalizeModules 把请求体规整成有序模块列表：
@@ -1578,6 +1601,7 @@ func (a *App) createConstraintTemplate(w http.ResponseWriter, r *http.Request) {
 	t := store.ConstraintTemplate{
 		ID:      fmt.Sprintf("tpl_%s_%s", time.Now().Format("20060102-150405"), randSuffix()),
 		Name:    req.Name,
+		Scene:   normalizeScene(req.Scene),
 		Modules: mods,
 	}
 	ts = append(ts, t)
@@ -1613,6 +1637,7 @@ func (a *App) updateConstraintTemplate(w http.ResponseWriter, r *http.Request) {
 	for i := range ts {
 		if ts[i].ID == id {
 			ts[i].Name = req.Name
+			ts[i].Scene = normalizeScene(req.Scene)
 			ts[i].Modules = mods
 			ts[i].Content = ""
 			if err := a.store.SaveConstraintTemplates(ts); err != nil {

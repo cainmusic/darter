@@ -55,7 +55,12 @@ const constraintText = ref('')
 const savingConstraint = ref(false)
 
 const constraintTemplateOptions = computed(() =>
-  constraintTemplates.value.map((t) => ({ label: t.name, value: t.id })),
+  constraintTemplates.value
+    .filter((t) => {
+      const sc = t.scene ?? 'common'
+      return sc === 'common' || sc === 'migration'
+    })
+    .map((t) => ({ label: t.name, value: t.id })),
 )
 const currentConstraintTemplate = computed(() =>
   constraintTemplates.value.find((t) => t.id === constraintTemplateId.value) ?? null,

@@ -207,8 +207,11 @@ type ConstraintModule struct {
 // 采用「两层」结构：第一层是模板本身，第二层是有序的模块列表（分段），
 // 使用时把各模块详情按顺序拼接成最终约束文本。
 type ConstraintTemplate struct {
-	ID      string             `json:"id"`
-	Name    string             `json:"name"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Scene 所属场景：fixer（审查修复）/ migration（代码迁移）/ common（通用）。
+	// 空值按 common 处理；用于约束模板页按场景区分、以及建任务时按场景过滤可选模板。
+	Scene   string             `json:"scene,omitempty"`
 	Modules []ConstraintModule `json:"modules"`
 	// Content 遗留字段：旧数据是单段文本。读取旧数据时若 Modules 为空而 Content 非空，自动包装成单模块。
 	// 新数据只写 Modules，此字段不再落盘（omitempty）。
@@ -217,6 +220,9 @@ type ConstraintTemplate struct {
 
 // normalize 兼容旧数据并保证模块 ID 存在：旧模板的整段 content 包装成单模块；空 ID 的模块补一个稳定 ID。
 func normalizeTemplate(t *ConstraintTemplate) {
+	if t.Scene == "" {
+		t.Scene = "common"
+	}
 	if len(t.Modules) == 0 && strings.TrimSpace(t.Content) != "" {
 		t.Modules = []ConstraintModule{{ID: "m0", Name: "内容", Content: t.Content}}
 		t.Content = ""

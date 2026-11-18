@@ -2,13 +2,14 @@
 import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  NButton, NCard, NEmpty, NInput, NSpace, useMessage, useDialog,
+  NButton, NCard, NEmpty, NInput, NSpace, NSelect, NTag, NModal, useMessage, useDialog,
 } from 'naive-ui'
 import {
   listConstraintTemplates, getConstraintTemplate, copyConstraintTemplate,
   createConstraintTemplate, updateConstraintTemplate, deleteConstraintTemplate,
-  concatTemplateContent,
+  listConstraintInjectables, SCENE_LABELS,
   type ConstraintTemplate, type ConstraintModule, type TemplateUser,
+  type InjectableCatalog, type InjectableField,
 } from '../api'
 import StatusBadge from '../components/StatusBadge.vue'
 import { GAP } from '../layout'
@@ -31,6 +32,46 @@ const collapsed = ref<Record<string, boolean>>({})
 // 编辑会话标识：切换模板/新建时自增，作为分段列表的 key，
 // 强制重建 autosize textarea，避免各模板间残留的输入框高度互相串。
 const editorKey = ref(0)
+
+const editScene = ref('common')
+const injectableCatalog = ref<InjectableCatalog | null>(null)
+const injectableError = ref('')
+const showInjectables = ref(false)
+
+const sceneOptions = [
+  { label: '通用', value: 'common' },
+  { label: '审查修复', value: 'fixer' },
+  { label: '代码迁移', value: 'migration' },
+]
+// 只展示「确有可注入字段」的场景，跳过通用等空段。
+const injectableScenes = computed(() => {
+  const scenes = injectableCatalog.value?.scenes ?? []
+  const fields = injectableCatalog.value?.fields ?? []
+  return scenes.filter((s) => fields.some((f) => f.scene === s.key))
+})
+const fieldsByScene = computed(() => {
+  const map = new Map<string, InjectableField[]>()
+  for (const f of injectableCatalog.value?.fields ?? []) {
+    const arr = map.get(f.scene) ?? []
+    arr.push(f)
+    map.set(f.scene, arr)
+  }
+  return map
+})
+
+function sceneLabel(s?: string) { return SCENE_LABELS[s ?? 'common'] ?? s ?? '通用' }
+async function openInjectables() {
+  showInjectables.value = true
+  injectableError.value = ''
+  if (!injectableCatalog.value) {
+    try { injectableCatalog.value = await listConstraintInjectables() } catch (e: any) {
+      injectableError.value = e?.message || '加载失败，请确认服务已重启到最新版本'
+    }
+  }
+}
+async function copyPlaceholder(p: string) {
+  try { await navigator.clipboard.writeText(p); message.success('已复制 ' + p) } catch { message.warning('复制失败，请手动复制') }
+}
 
 const current = computed(() => templates.value.find((t) => t.id === selectedId.value) ?? null)
 
@@ -80,6 +121,7 @@ async function select(id: string | null) {
   isNew.value = false
   const t = templates.value.find((x) => x.id === id)
   editName.value = t?.name ?? ''
+  editScene.value = t?.scene ?? 'common'
   editModules.value = (t?.modules ?? []).map((m) => ({ ...m }))
   collapsed.value = {}
   editorKey.value++
@@ -96,6 +138,7 @@ function newTemplate() {
   selectedId.value = null
   isNew.value = true
   editName.value = ''
+  editScene.value = 'common'
   editModules.value = [{ id: genModuleId(), name: '', content: '' }]
   collapsed.value = {}
   editorKey.value++
@@ -136,10 +179,10 @@ async function doSave() {
   try {
     let t: ConstraintTemplate
     if (isNew.value) {
-      t = await createConstraintTemplate(name, mods)
+      t = await createConstraintTemplate(name, mods, editScene.value)
       templates.value.push(t)
     } else if (selectedId.value) {
-      t = await updateConstraintTemplate(selectedId.value, name, mods)
+      t = await updateConstraintTemplate(selectedId.value, name, mods, editScene.value)
       const i = templates.value.findIndex((x) => x.id === t.id)
       if (i >= 0) templates.value[i] = t
     } else {
@@ -180,7 +223,10 @@ onMounted(() => load())
 <template>
   <div style="height:100%;display:flex;flex-direction:column;padding:8px">
     <PageHeader title="约束模板">
-      <n-button type="primary" @click="newTemplate">+ 新建模板</n-button>
+      <n-space>
+        <n-button @click="openInjectables">可注入字段</n-button>
+        <n-button type="primary" @click="newTemplate">+ 新建模板</n-button>
+      </n-space>
     </PageHeader>
 
     <div :style="`display:flex;gap:${GAP}px;align-items:stretch;flex:1;min-height:0`">
@@ -198,9 +244,7 @@ onMounted(() => load())
             }">
             <div style="min-width:0;flex:1">
               <div style="font-size:13px;font-weight:600">{{ t.name }}</div>
-              <div style="font-size:12px;color:var(--cy-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px">
-                {{ concatTemplateContent(t) }}
-              </div>
+              <n-tag size="tiny" :bordered="false" style="margin-top:4px">{{ sceneLabel(t.scene) }}</n-tag>
             </div>
             <n-button size="tiny" type="error" text @click.stop="del(t)">删除</n-button>
           </div>
@@ -224,6 +268,10 @@ onMounted(() => load())
               <div style="margin-bottom:12px">
                 <div style="font-size:12px;color:var(--cy-muted);margin-bottom:6px">模板名称</div>
                 <n-input v-model:value="editName" placeholder="如：Go 项目通用约束" />
+              </div>
+              <div style="margin-bottom:12px">
+                <div style="font-size:12px;color:var(--cy-muted);margin-bottom:6px">所属场景</div>
+                <n-select v-model:value="editScene" :options="sceneOptions" style="max-width:260px" />
               </div>
             </div>
 
@@ -279,5 +327,48 @@ onMounted(() => load())
         </n-card>
       </div>
     </div>
+
+    <!-- 可注入字段表 -->
+    <n-modal v-model:show="showInjectables" preset="card" title="可注入字段" style="max-width:820px">
+      <div style="font-size:12px;color:var(--cy-muted);margin-bottom:12px">
+        写约束文本时可插入以下占位符，运行时会被替换成对应任务的真实信息。点击占位符复制。
+      </div>
+      <div v-if="injectableError" style="font-size:12px;color:#d03050;margin-bottom:12px">
+        加载失败：{{ injectableError }}
+      </div>
+      <div v-else-if="!injectableCatalog" style="font-size:12px;color:var(--cy-muted);padding:20px 0;text-align:center">加载中…</div>
+      <div v-else style="max-height:60vh;overflow:auto;padding-right:4px">
+        <div v-for="sc in injectableScenes" :key="sc.key" style="margin-bottom:16px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px">{{ sc.name }}</div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--cy-border);color:var(--cy-muted);font-weight:600;width:240px">占位符</th>
+                <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--cy-border);color:var(--cy-muted);font-weight:600">说明</th>
+                <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--cy-border);color:var(--cy-muted);font-weight:600;width:140px">有值时机</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="f in (fieldsByScene.get(sc.key) ?? [])" :key="f.placeholder">
+                <td style="padding:6px 8px;vertical-align:top;border-bottom:1px solid var(--cy-border)">
+                  <code @click="copyPlaceholder(f.placeholder)" title="点击复制"
+                    style="font-family:var(--font-mono);font-size:12px;color:var(--cy-cyan);cursor:pointer;word-break:break-all">{{ f.placeholder }}</code>
+                </td>
+                <td style="padding:6px 8px;vertical-align:top;border-bottom:1px solid var(--cy-border)">
+                  <div>{{ f.name }}</div>
+                  <div style="color:var(--cy-muted);margin-top:2px">{{ f.description }}</div>
+                </td>
+                <td style="padding:6px 8px;vertical-align:top;border-bottom:1px solid var(--cy-border);color:var(--cy-amber)">{{ f.availability }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <template #footer>
+        <n-space justify="end">
+          <n-button @click="showInjectables = false">关闭</n-button>
+        </n-space>
+      </template>
+    </n-modal>
   </div>
 </template>

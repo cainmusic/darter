@@ -979,6 +979,13 @@ func (a *App) resolveConflictWithAI(ctx context.Context, g *git.Service, j *job.
 		return "", "", false, fmt.Errorf("没有冲突文件")
 	}
 
+	// 用迁移上下文替换约束里的 {{migration.*}} 占位符：三个分支 + 当前源 commit（CHERRY_PICK_HEAD）+ 冲突文件。
+	var srcCommit *job.CommitEntry
+	if ci, err := g.ResolveCommit("CHERRY_PICK_HEAD"); err == nil {
+		srcCommit = &job.CommitEntry{Hash: ci.Hash, Subject: ci.Subject, Message: ci.Message}
+	}
+	constraints = ai.RenderConstraints(constraints, ai.MigrationConstraintValues(j.Migration, srcCommit, files))
+
 	recordAttempt("AI 开始尝试解决冲突")
 
 	maxAttempts := j.Migration.MaxRetries
@@ -1450,6 +1457,8 @@ func (a *App) runMigrationRegression(j *job.Job) {
 		},
 	}
 	constraints := a.store.ResolveConstraint(j.ConstraintTemplateID, j.Constraints)
+	// 全量回归阶段没有单一源 commit，故只替换三个分支占位符（commit/冲突文件占位符替换为空串）。
+	constraints = ai.RenderConstraints(constraints, ai.MigrationConstraintValues(j.Migration, nil, nil))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

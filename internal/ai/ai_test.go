@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"darter/internal/job"
 )
 
 func TestNewPaths(t *testing.T) {
@@ -115,5 +117,41 @@ func TestNewFilesBlock(t *testing.T) {
 		if !strings.Contains(got, p) {
 			t.Errorf("newFilesBlock output missing %q: %q", p, got)
 		}
+	}
+}
+
+func TestRenderConstraints(t *testing.T) {
+	tmpl := "源={{migration.source_branch}} 基底={{migration.target_base}} 目标={{migration.target_branch}} commit={{migration.source_commit}} 标题={{migration.source_commit_subject}} 信息={{migration.source_commit_message}} 冲突={{migration.conflict_files}}"
+	vals := MigrationConstraintValues(
+		&job.MigrationSpec{SourceBranch: "src", TargetBase: "base", TargetBranch: "dst"},
+		&job.CommitEntry{Hash: "abc123", Subject: "subject", Message: "body"},
+		[]string{"a.go", "b.go"},
+	)
+	got := RenderConstraints(tmpl, vals)
+	for _, want := range []string{
+		"源=src", "基底=base", "目标=dst", "commit=abc123", "标题=subject", "信息=body", "冲突=a.go\nb.go",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("RenderConstraints 缺少 %q：\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "{{migration.") {
+		t.Errorf("替换后不应残留任何 {{migration.*}} 字面量：\n%s", got)
+	}
+
+	// 无单一源 commit（全量回归阶段）：commit/冲突文件占位符替换为空串，而非残留字面量。
+	got2 := RenderConstraints(tmpl, MigrationConstraintValues(&job.MigrationSpec{SourceBranch: "s", TargetBase: "b", TargetBranch: "d"}, nil, nil))
+	if strings.Contains(got2, "{{migration.") {
+		t.Errorf("无 commit 时仍残留字面量：\n%s", got2)
+	}
+	if !strings.Contains(got2, "commit= 标题=") {
+		t.Errorf("commit/标题占位符应替换为空串：\n%s", got2)
+	}
+}
+
+func TestFixerConstraintValues(t *testing.T) {
+	got := RenderConstraints("基线={{fixer.base_branch}} 修复={{fixer.fix_branch}}", FixerConstraintValues(&job.Job{BaseBranch: "main", FixBranch: "fix/1"}))
+	if got != "基线=main 修复=fix/1" {
+		t.Errorf("FixerConstraintValues 替换错误：%q", got)
 	}
 }

@@ -149,19 +149,27 @@ export const getSettings = () => api<Settings>('/api/settings')
 export const saveSettings = (s: Settings) => api<Settings>('/api/settings', { method: 'PUT', body: JSON.stringify(s) })
 
 export interface ConstraintModule { id: string; name: string; content: string }
-export interface ConstraintTemplate { id: string; name: string; modules: ConstraintModule[] }
+export interface ConstraintTemplate { id: string; name: string; scene?: string; modules: ConstraintModule[] }
 
 export interface TemplateUser { id: string; name: string; status: string }
 export interface ConstraintTemplateDetail { template: ConstraintTemplate; used_by: TemplateUser[] }
 
+// 约束模板场景中文名（common=通用 / fixer=审查修复 / migration=代码迁移）。
+export const SCENE_LABELS: Record<string, string> = { common: '通用', fixer: '审查修复', migration: '代码迁移' }
+
+export interface ConstraintScene { key: string; name: string }
+export interface InjectableField { scene: string; placeholder: string; name: string; description: string; availability: string }
+export interface InjectableCatalog { scenes: ConstraintScene[]; fields: InjectableField[] }
+
 export const listConstraintTemplates = () => api<ConstraintTemplate[]>('/api/constraint-templates')
+export const listConstraintInjectables = () => api<InjectableCatalog>('/api/constraint-injectables')
 export const getConstraintTemplate = (id: string) => api<ConstraintTemplateDetail>(`/api/constraint-templates/${id}`)
 export const copyConstraintTemplate = (id: string) =>
   api<ConstraintTemplate>(`/api/constraint-templates/${id}/copy`, { method: 'POST' })
-export const createConstraintTemplate = (name: string, modules: ConstraintModule[]) =>
-  api<ConstraintTemplate>('/api/constraint-templates', { method: 'POST', body: JSON.stringify({ name, modules }) })
-export const updateConstraintTemplate = (id: string, name: string, modules: ConstraintModule[]) =>
-  api<ConstraintTemplate>(`/api/constraint-templates/${id}`, { method: 'PUT', body: JSON.stringify({ name, modules }) })
+export const createConstraintTemplate = (name: string, modules: ConstraintModule[], scene = 'common') =>
+  api<ConstraintTemplate>('/api/constraint-templates', { method: 'POST', body: JSON.stringify({ name, modules, scene }) })
+export const updateConstraintTemplate = (id: string, name: string, modules: ConstraintModule[], scene = 'common') =>
+  api<ConstraintTemplate>(`/api/constraint-templates/${id}`, { method: 'PUT', body: JSON.stringify({ name, modules, scene }) })
 export const deleteConstraintTemplate = (id: string) =>
   api<{ status: string }>(`/api/constraint-templates/${id}`, { method: 'DELETE' })
 
