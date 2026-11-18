@@ -205,6 +205,7 @@ func (a *App) reloadMigCommits(j *job.Job) error {
 	skipped := map[string]bool{}
 	mark := map[string]string{}
 	targetCommit := map[string]string{}
+	skipReason := map[string]string{}
 	for _, e := range existing {
 		if e.State == job.CommitSkipped {
 			skipped[e.Hash] = true
@@ -214,6 +215,9 @@ func (a *App) reloadMigCommits(j *job.Job) error {
 		}
 		if e.TargetCommit != "" {
 			targetCommit[e.Hash] = e.TargetCommit
+		}
+		if e.SkipReason != "" {
+			skipReason[e.Hash] = e.SkipReason
 		}
 	}
 
@@ -247,6 +251,7 @@ func (a *App) reloadMigCommits(j *job.Job) error {
 		if skipped[sc.Hash] {
 			e.State = job.CommitSkipped
 			e.TargetCommit = ""
+			e.SkipReason = skipReason[sc.Hash]
 		}
 		if m, ok := mark[sc.Hash]; ok {
 			e.Mark = m
@@ -314,6 +319,7 @@ func (a *App) setTargetCommit(w http.ResponseWriter, r *http.Request) {
 		// 清除映射 → 待迁移
 		commits[idx].TargetCommit = ""
 		commits[idx].State = job.CommitPending
+		commits[idx].SkipReason = ""
 	} else {
 		// 校验 target_commit 确实在目标分支历史里
 		g := git.New(j.RepoPath)
@@ -364,8 +370,10 @@ func (a *App) ignoreCommit(w http.ResponseWriter, r *http.Request) {
 	if req.Ignored {
 		commits[idx].State = job.CommitSkipped
 		commits[idx].LastError = ""
+		commits[idx].SkipReason = "人工忽略"
 	} else if commits[idx].State == job.CommitSkipped {
 		commits[idx].State = job.CommitPending
+		commits[idx].SkipReason = ""
 	}
 	if err := a.store.SaveMigrations(j.ID, commits); err != nil {
 		writeErr(w, 500, err.Error())
@@ -404,6 +412,7 @@ func (a *App) ignoreRange(w http.ResponseWriter, r *http.Request) {
 		if commits[i].State != job.CommitMigrated {
 			commits[i].State = job.CommitSkipped
 			commits[i].LastError = ""
+			commits[i].SkipReason = "人工忽略"
 			ignored++
 		}
 	}
@@ -545,6 +554,7 @@ func (a *App) cherryPickOne(g *git.Service, j *job.Job, e job.CommitEntry) (job.
 		e.State = job.CommitMigrated
 		e.TargetCommit = newHash
 		e.LastError = ""
+		e.SkipReason = ""
 		a.publish("migration_commit", j.ID, e.Hash, "已迁移 "+e.Subject, e)
 		return e, false
 	}
@@ -558,6 +568,7 @@ func (a *App) cherryPickOne(g *git.Service, j *job.Job, e job.CommitEntry) (job.
 			_ = g.CleanUntracked()
 			e.State = job.CommitSkipped
 			e.LastError = ""
+			e.SkipReason = "空 commit（改动已在目标分支存在）"
 			a.publish("migration_commit_empty", j.ID, e.Hash, "空 commit（改动已在目标分支存在），已跳过", e)
 			return e, false
 		}
@@ -828,6 +839,7 @@ func (a *App) resolveConflict(w http.ResponseWriter, r *http.Request) {
 		commits[idx].State = job.CommitMigrated
 		commits[idx].TargetCommit = resolvedHash
 		commits[idx].LastError = ""
+		commits[idx].SkipReason = ""
 	case "abort":
 		if err := g.CherryPickAbort(); err != nil {
 			writeErr(w, 500, "中止 cherry-pick 失败: "+err.Error())
@@ -839,6 +851,7 @@ func (a *App) resolveConflict(w http.ResponseWriter, r *http.Request) {
 		}
 		commits[idx].State = job.CommitPending
 		commits[idx].LastError = ""
+		commits[idx].SkipReason = ""
 	case "skip":
 		if err := g.CherryPickAbort(); err != nil {
 			writeErr(w, 500, "中止 cherry-pick 失败: "+err.Error())
@@ -850,6 +863,10 @@ func (a *App) resolveConflict(w http.ResponseWriter, r *http.Request) {
 		}
 		commits[idx].State = job.CommitSkipped
 		commits[idx].LastError = ""
+		commits[idx].SkipReason = req.Note
+		if commits[idx].SkipReason == "" {
+			commits[idx].SkipReason = "人工跳过"
+		}
 	}
 
 	if ci >= 0 {
@@ -1120,6 +1137,7 @@ func (a *App) runAiResolveConflict(j *job.Job) {
 		if idx >= 0 {
 			commits[idx].State = job.CommitSkipped
 			commits[idx].LastError = ""
+			commits[idx].SkipReason = summary
 		}
 		_ = a.store.SaveMigrations(j.ID, commits)
 		cs, _ := a.store.LoadConflicts(j.ID)
@@ -1314,6 +1332,7 @@ func (a *App) runAutoMigrate(j *job.Job) {
 				_ = g.CleanUntracked()
 				commits[i].State = job.CommitSkipped
 				commits[i].LastError = ""
+				commits[i].SkipReason = summary
 				cs, _ := a.store.LoadConflicts(j.ID)
 				ci := activeConflictIndex(cs)
 				if ci >= 0 {

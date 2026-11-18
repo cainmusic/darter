@@ -54,6 +54,7 @@ type CommitEntry struct {
 	State        CommitState `json:"state"`
 	TargetCommit string      `json:"target_commit,omitempty"` // 迁移到目标分支后的新 hash
 	Mark         string      `json:"mark,omitempty"`          // 标记类型：""/star/triangle/square/circle，不同颜色区分不同用途
+	SkipReason   string      `json:"skip_reason,omitempty"`   // 跳过原因（空 commit / 仅生成物 / 人工忽略 / 人工跳过）
 	LastError    string      `json:"last_error,omitempty"`
 }
 

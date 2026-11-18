@@ -34,11 +34,12 @@ const rangeEndHash = ref<string | null>(null)
 const hideSkipped = ref(false)
 const scrollContainer = ref<HTMLElement | null>(null)
 const showCommitDetail = ref(false)
-const commitDetail = ref<{ hash: string; subject: string; message: string; author: string; date: string } | null>(null)
+const commitDetail = ref<{ hash: string; subject: string; message: string; author: string; date: string; skip_reason?: string } | null>(null)
 const showConflictDetail = ref(false)
 const conflictDetailTargetHash = ref<string | null>(null)
+const showAiHistory = ref(false)
 
-function openCommitDetail(c: { hash: string; subject: string; message: string; author: string; date: string }) {
+function openCommitDetail(c: { hash: string; subject: string; message: string; author: string; date: string; skip_reason?: string }) {
   commitDetail.value = c
   showCommitDetail.value = true
 }
@@ -53,6 +54,32 @@ let refreshTimer: number | undefined
 const job = computed(() => detail.value?.job)
 const commits = computed(() => detail.value?.commits ?? [])
 const conflicts = computed(() => detail.value?.conflicts ?? [])
+// 当前查看的 commit 关联的冲突记录（source_hash 匹配，含 skip/abort 等无 target_commit 的记录）
+const commitConflictRecords = computed(() => {
+  if (!commitDetail.value) return []
+  return conflicts.value.filter((c) => c.source_hash === commitDetail.value?.hash)
+})
+// AI 处理历史：按 commit 分组，commit 按「最近处理时间」倒序，组内按时间正序
+const aiHistory = computed(() => {
+  const byCommit = new Map<string, ConflictRecord[]>()
+  for (const c of conflicts.value) {
+    const arr = byCommit.get(c.source_hash) ?? []
+    arr.push(c)
+    byCommit.set(c.source_hash, arr)
+  }
+  const groups = [...byCommit.entries()].map(([hash, records]) => {
+    records.sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''))
+    const commit = commits.value.find((x) => x.hash === hash)
+    return {
+      hash,
+      subject: commit?.subject ?? '',
+      records,
+      lastAt: records[records.length - 1]?.created_at || '',
+    }
+  })
+  groups.sort((a, b) => b.lastAt.localeCompare(a.lastAt))
+  return groups
+})
 const targetCommits = computed(() => detail.value?.target_commits ?? [])
 const targetHead = computed(() => targetCommits.value[targetCommits.value.length - 1]?.hash ?? '')
 const targetHashSet = computed(() => new Set(targetCommits.value.map((c) => c.hash)))
@@ -629,6 +656,7 @@ onBeforeUnmount(() => {
             {{ runningLabel }}
           </span>
           <n-button size="small" @click="refresh">刷新</n-button>
+          <n-button size="small" @click="showAiHistory = true">AI 处理历史</n-button>
           <AiActivityButton :job-id="id" />
           <n-button size="small" @click="showDetail = true">详情</n-button>
           <n-button size="small" type="error" :disabled="isFinished || busy" @click="confirmComplete">完成</n-button>
@@ -814,12 +842,51 @@ onBeforeUnmount(() => {
         <div>Hash：<span style="font-family:var(--font-mono)">{{ commitDetail.hash }}</span></div>
         <div>作者：{{ commitDetail.author }}</div>
         <div>时间：{{ fmt(commitDetail.date) }}</div>
+        <div v-if="commitDetail.skip_reason" style="margin-top:4px;color:var(--cy-amber)">跳过原因：{{ commitDetail.skip_reason }}</div>
+        <div v-for="rec in commitConflictRecords" :key="rec.id"
+          style="margin-top:8px;border:1px solid var(--cy-border);border-radius:4px;padding:8px 10px;background:var(--cy-hover-bg)">
+          <div style="font-size:12px;color:var(--cy-muted)">冲突处理（{{ resolutionLabel(rec.resolution) }}）</div>
+          <div v-if="rec.note" style="white-space:pre-wrap;word-break:break-all;font-size:12px;margin-top:4px">{{ rec.note }}</div>
+          <div v-if="rec.ai_attempts?.length" style="margin-top:6px">
+            <div v-for="(a, ai) in rec.ai_attempts" :key="ai" style="font-size:12px;color:var(--cy-muted);white-space:pre-wrap;word-break:break-all">{{ a }}</div>
+          </div>
+        </div>
         <div style="margin-top:8px">Message：</div>
         <div style="white-space:pre-wrap;word-break:break-all;font-size:12px;background:var(--cy-hover-bg);border:1px solid var(--cy-border);border-radius:4px;padding:8px 10px">{{ commitDetail.message }}</div>
       </div>
       <template #footer>
         <n-space justify="end">
           <n-button @click="showCommitDetail = false">关闭</n-button>
+        </n-space>
+      </template>
+    </n-modal>
+
+    <n-modal v-model:show="showAiHistory" preset="card" title="AI 处理历史" style="max-width:760px">
+      <div style="max-height:70vh;overflow:auto;padding-right:4px">
+        <n-empty v-if="!aiHistory.length" description="暂无处理记录" style="margin:24px 0" />
+        <div v-for="g in aiHistory" :key="g.hash"
+          style="margin-bottom:12px;border:1px solid var(--cy-border);border-radius:4px;padding:10px 12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-family:var(--font-mono);color:var(--cy-cyan)">{{ short(g.hash) }}</span>
+            <span style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ g.subject }}</span>
+          </div>
+          <div v-for="rec in g.records" :key="rec.id"
+            style="margin-top:8px;padding-left:12px;border-left:2px solid var(--cy-border)">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <n-tag size="tiny" :bordered="false" :style="handlerStyle(rec.handler)">{{ handlerLabel(rec.handler) }}</n-tag>
+              <n-tag size="tiny" :bordered="false" :style="resolutionStyle(rec.resolution)">{{ resolutionLabel(rec.resolution) }}</n-tag>
+              <span style="font-size:12px;color:var(--cy-muted)">{{ fmt(rec.created_at) }}</span>
+            </div>
+            <div v-if="rec.note" style="font-size:12px;white-space:pre-wrap;word-break:break-all;margin-top:4px">{{ rec.note }}</div>
+            <div v-if="rec.ai_attempts?.length" style="margin-top:4px">
+              <div v-for="(a, ai) in rec.ai_attempts" :key="ai" style="font-size:12px;color:var(--cy-muted);white-space:pre-wrap;word-break:break-all">{{ a }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <n-space justify="end">
+          <n-button @click="showAiHistory = false">关闭</n-button>
         </n-space>
       </template>
     </n-modal>

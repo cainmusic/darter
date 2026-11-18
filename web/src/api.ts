@@ -249,6 +249,7 @@ export interface CommitEntry {
   state: CommitState
   target_commit?: string
   mark?: string
+  skip_reason?: string
   last_error?: string
 }
 
